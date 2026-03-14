@@ -1,0 +1,16 @@
+/*
+!/.gitignore
+!/LICENSE
+!/README.md
+!/TODO.md
+!/sreapeat.csproj
+!/App.xaml
+!/App.xaml.cs
+!/MainWindow.xaml
+!/MainWindow.xaml.cs
+!/Helpers/
+!/Helpers/**
+!/Models/
+!/Models/**
+!/Services/
+!/Services/**
