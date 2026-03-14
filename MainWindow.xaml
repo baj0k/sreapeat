@@ -2,217 +2,269 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="sreapeat"
-        Width="430"
-        Height="255"
-        MinWidth="420"
-        MinHeight="245"
+        Width="356"
+        Height="158"
+        MinWidth="348"
+        MinHeight="154"
         WindowStartupLocation="CenterScreen"
-        Background="#ECE9D8">
+        Background="#F1EFE7">
     <Window.Resources>
-        <Style x:Key="ToolbarButtonStyle" TargetType="Button">
-            <Setter Property="Width" Value="104" />
-            <Setter Property="Height" Value="56" />
-            <Setter Property="Margin" Value="0,0,10,0" />
-            <Setter Property="Padding" Value="8" />
-            <Setter Property="Background" Value="#F2F2F2" />
-            <Setter Property="BorderBrush" Value="#ACA899" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Style.Triggers>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Opacity" Value="0.55" />
-                </Trigger>
-            </Style.Triggers>
+        <Style x:Key="CompactMenuStyle" TargetType="Menu">
+            <Setter Property="Background" Value="#F1EFE7" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Padding" Value="2,0" />
+            <Setter Property="Height" Value="22" />
         </Style>
 
-        <Style x:Key="ToolbarToggleStyle" TargetType="ToggleButton">
-            <Setter Property="Width" Value="104" />
-            <Setter Property="Height" Value="56" />
+        <Style x:Key="CompactMenuItemStyle" TargetType="MenuItem">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Padding" Value="6,2" />
+        </Style>
+
+        <Style x:Key="IconButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="48" />
+            <Setter Property="Height" Value="48" />
             <Setter Property="Margin" Value="0,0,10,0" />
-            <Setter Property="Padding" Value="8" />
-            <Setter Property="Background" Value="#F2F2F2" />
-            <Setter Property="BorderBrush" Value="#ACA899" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Cursor" Value="Hand" />
-            <Style.Triggers>
-                <Trigger Property="IsChecked" Value="True">
-                    <Setter Property="Background" Value="#E2DED0" />
-                    <Setter Property="BorderBrush" Value="#7F7A69" />
-                </Trigger>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Opacity" Value="0.55" />
-                </Trigger>
-            </Style.Triggers>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#E3DED0" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#D3CCBC" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="IconToggleStyle" TargetType="ToggleButton">
+            <Setter Property="Width" Value="48" />
+            <Setter Property="Height" Value="48" />
+            <Setter Property="Margin" Value="0,0,10,0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#E3DED0" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#DAD2BE" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#D3CCBC" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CompactTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Width" Value="54" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="Padding" Value="4,2" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="BorderBrush" Value="#CFC9BA" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Background" Value="#FBFAF5" />
         </Style>
     </Window.Resources>
 
     <DockPanel LastChildFill="True">
-        <Border DockPanel.Dock="Top"
-                BorderBrush="#C5C2B8"
-                BorderThickness="0,0,0,1"
-                Background="#F7F7F7">
-            <Menu Background="#F7F7F7">
-                <MenuItem Header="_File">
-                    <MenuItem Header="E_xit" Click="ExitMenuItem_OnClick" />
-                </MenuItem>
-                <MenuItem Header="_Options">
-                    <MenuItem Header="_Record / Stop" Click="RecordMenuItem_OnClick" />
-                    <MenuItem Header="_Play / Stop" Click="PlayMenuItem_OnClick" />
-                </MenuItem>
-                <MenuItem Header="_Help">
-                    <MenuItem Header="_About" Click="AboutMenuItem_OnClick" />
-                </MenuItem>
-            </Menu>
-        </Border>
+        <Menu DockPanel.Dock="Top"
+              Style="{StaticResource CompactMenuStyle}">
+            <MenuItem Header="_File">
+                <MenuItem Header="E_xit" Click="ExitMenuItem_OnClick" />
+            </MenuItem>
+            <MenuItem Header="_Options">
+                <MenuItem Header="_Record / Stop" Click="RecordMenuItem_OnClick" />
+                <MenuItem Header="_Play / Stop" Click="PlayMenuItem_OnClick" />
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="_About" Click="AboutMenuItem_OnClick" />
+            </MenuItem>
+            <Menu.ItemContainerStyle>
+                <Style BasedOn="{StaticResource CompactMenuItemStyle}" TargetType="MenuItem" />
+            </Menu.ItemContainerStyle>
+        </Menu>
 
-        <Border DockPanel.Dock="Top"
-                Background="#F4F4F4"
-                BorderBrush="#D1CEC4"
-                BorderThickness="0,0,0,1"
-                Padding="8,4">
-            <TextBlock x:Name="ShortcutLegendTextBlock"
-                       FontSize="10"
-                       Foreground="#5E5A50"
-                       Text="F5 record on/off | F6 play or stop" />
-        </Border>
+        <TextBlock x:Name="ShortcutLegendTextBlock"
+                   DockPanel.Dock="Top"
+                   Margin="10,1,10,0"
+                   FontSize="8"
+                   Foreground="#6B6559"
+                   TextAlignment="Center"
+                   HorizontalAlignment="Stretch"
+                   Text="F5 Record    F6 Play/Stop" />
 
-        <StatusBar DockPanel.Dock="Bottom"
-                   Background="#ECE9D8"
-                   BorderBrush="#B8B4A8"
-                   BorderThickness="1,1,1,0"
-                   Padding="0">
-            <StatusBarItem>
-                <TextBlock x:Name="StatusTextBlock" Text="Ready..." />
-            </StatusBarItem>
-            <Separator />
-            <StatusBarItem HorizontalAlignment="Right">
-                <TextBlock x:Name="EventCountTextBlock" Text="0 events" />
-            </StatusBarItem>
-        </StatusBar>
+        <Grid DockPanel.Dock="Bottom"
+              Margin="0,4,0,0"
+              Background="#F6F4ED">
+            <Border BorderBrush="#D8D3C6"
+                    BorderThickness="0,1,0,0"
+                    Padding="8,2">
+                <DockPanel>
+                    <TextBlock x:Name="StatusTextBlock"
+                               DockPanel.Dock="Left"
+                               FontSize="11"
+                               Text="Ready..." />
+                    <TextBlock x:Name="EventCountTextBlock"
+                               DockPanel.Dock="Right"
+                               FontSize="11"
+                               Foreground="#6B6559"
+                               Text="0 events" />
+                </DockPanel>
+            </Border>
+        </Grid>
 
-        <Border Margin="12"
-                Background="#ECE9D8"
-                BorderBrush="#B8B4A8"
-                BorderThickness="1">
-            <Grid Margin="10">
+        <Grid Margin="10,4,10,0"
+              VerticalAlignment="Center">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Orientation="Horizontal"
+                        Grid.Column="0"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center">
+                <Button x:Name="PlayButton"
+                        Style="{StaticResource IconButtonStyle}"
+                        Click="PlayButton_OnClick"
+                        ToolTip="Play or stop the current macro">
+                    <Grid Width="24"
+                          Height="24"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center">
+                        <Polygon x:Name="PlayIcon"
+                                 Points="4,2 20,12 4,22"
+                                 Fill="#91C433"
+                                 Stroke="#6A8D23"
+                                 StrokeThickness="1.2" />
+                        <Rectangle x:Name="StopIcon"
+                                   Width="13"
+                                   Height="13"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   RadiusX="1"
+                                   RadiusY="1"
+                                   Fill="#B94242"
+                                   Visibility="Collapsed" />
+                    </Grid>
+                </Button>
+
+                <ToggleButton x:Name="RecordToggleButton"
+                              Style="{StaticResource IconToggleStyle}"
+                              Checked="RecordToggleButton_OnChecked"
+                              Unchecked="RecordToggleButton_OnUnchecked"
+                              ToolTip="Start or stop recording">
+                    <Ellipse Width="18"
+                             Height="18"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center"
+                             Fill="#F25050"
+                             Stroke="#B53C3C"
+                             StrokeThickness="1.2" />
+                </ToggleButton>
+
+                <ToggleButton x:Name="LoopToggleButton"
+                              Style="{StaticResource IconToggleStyle}"
+                              Margin="0"
+                              Checked="LoopToggleButton_OnChanged"
+                              Unchecked="LoopToggleButton_OnChanged"
+                              ToolTip="Loop playback until stopped">
+                    <Grid Width="24"
+                          Height="24"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center">
+                        <Path Stroke="#4D5A64"
+                              StrokeThickness="1.7"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              Data="M4,8 C4,5 7,3.5 10,3.5 H16" />
+                        <Path Stroke="#4D5A64"
+                              StrokeThickness="1.7"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              Data="M20,16 C20,19 17,20.5 14,20.5 H8" />
+                        <Path Stroke="#4D5A64"
+                              StrokeThickness="1.7"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              Data="M13,1.5 L16,3.5 L13,5.5" />
+                        <Path Stroke="#4D5A64"
+                              StrokeThickness="1.7"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              Data="M11,18.5 L8,20.5 L11,22.5" />
+                    </Grid>
+                </ToggleButton>
+            </StackPanel>
+
+            <Grid Grid.Column="2"
+                  VerticalAlignment="Center">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="10" />
+                    <RowDefinition Height="6" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="10" />
+                    <ColumnDefinition Width="6" />
                     <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="10" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <Button x:Name="PlayButton"
-                        Style="{StaticResource ToolbarButtonStyle}"
-                        Click="PlayButton_OnClick"
-                        ToolTip="Play or stop the current macro">
-                    <StackPanel HorizontalAlignment="Center">
-                        <Viewbox Width="24" Height="24" Margin="0,0,0,3">
-                            <Canvas Width="24" Height="24">
-                                <Polygon Points="4,2 20,12 4,22"
-                                         Fill="#9ACD32"
-                                         Stroke="#6E8E23"
-                                         StrokeThickness="1.2" />
-                            </Canvas>
-                        </Viewbox>
-                        <TextBlock x:Name="PlayButtonLabel"
-                                   HorizontalAlignment="Center"
-                                   Text="Play" />
-                    </StackPanel>
-                </Button>
+                <TextBlock VerticalAlignment="Center"
+                           Foreground="#484236"
+                           Text="Repeat" />
+                <TextBox x:Name="RepeatCountTextBox"
+                         Grid.Column="2"
+                         Style="{StaticResource CompactTextBoxStyle}"
+                         Text="1" />
 
-                <ToggleButton x:Name="RecordToggleButton"
-                              Grid.Column="2"
-                              Style="{StaticResource ToolbarToggleStyle}"
-                              Checked="RecordToggleButton_OnChecked"
-                              Unchecked="RecordToggleButton_OnUnchecked"
-                              ToolTip="Start or stop recording">
-                    <StackPanel HorizontalAlignment="Center">
-                        <Viewbox Width="24" Height="24" Margin="0,0,0,3">
-                            <Canvas Width="24" Height="24">
-                                <Ellipse Width="18"
-                                         Height="18"
-                                         Canvas.Left="3"
-                                         Canvas.Top="3"
-                                         Fill="#F25050"
-                                         Stroke="#B53C3C"
-                                         StrokeThickness="1.2" />
-                            </Canvas>
-                        </Viewbox>
-                        <TextBlock x:Name="RecordButtonLabel"
-                                   HorizontalAlignment="Center"
-                                   Text="Record" />
-                    </StackPanel>
-                </ToggleButton>
-
-                <ToggleButton x:Name="LoopToggleButton"
-                              Grid.Column="4"
-                              Width="86"
-                              Margin="0"
-                              Style="{StaticResource ToolbarToggleStyle}"
-                              Checked="LoopToggleButton_OnChanged"
-                              Unchecked="LoopToggleButton_OnChanged"
-                              ToolTip="Loop playback until stopped">
-                    <TextBlock x:Name="LoopButtonLabel"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               Text="Loop Off" />
-                </ToggleButton>
-
-                <Border Grid.Row="2"
-                        Grid.ColumnSpan="6"
-                        BorderBrush="#C8C4B7"
-                        BorderThickness="1"
-                        Padding="10,8"
-                        Background="#F3F1E9">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="8" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="18" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="8" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <TextBlock Foreground="#3F3B32"
-                                   VerticalAlignment="Center"
-                                   Text="Repeat count" />
-
-                        <TextBox x:Name="RepeatCountTextBox"
-                                 Grid.Column="2"
-                                 Width="58"
-                                 Height="24"
-                                 VerticalContentAlignment="Center"
-                                 HorizontalContentAlignment="Center"
-                                 Text="1" />
-
-                        <TextBlock Grid.Column="4"
-                                   Foreground="#3F3B32"
-                                   VerticalAlignment="Center"
-                                   Text="Speed x" />
-
-                        <TextBox x:Name="SpeedTextBox"
-                                 Grid.Column="6"
-                                 Width="58"
-                                 Height="24"
-                                 VerticalContentAlignment="Center"
-                                 HorizontalContentAlignment="Center"
-                                 Text="1.00" />
-                    </Grid>
-                </Border>
+                <TextBlock Grid.Row="2"
+                           VerticalAlignment="Center"
+                           Foreground="#484236"
+                           Text="Speed x" />
+                <TextBox x:Name="SpeedTextBox"
+                         Grid.Row="2"
+                         Grid.Column="2"
+                         Style="{StaticResource CompactTextBoxStyle}"
+                         Text="1.00" />
             </Grid>
-        </Border>
+        </Grid>
     </DockPanel>
 </Window>

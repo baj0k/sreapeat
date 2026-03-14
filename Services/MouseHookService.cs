@@ -18,6 +18,8 @@ internal sealed class MouseHookService : IDisposable
 
     public event EventHandler<MacroEvent>? MouseActionCaptured;
 
+    public Func<int, int, bool>? ShouldIgnorePoint { get; set; }
+
     public bool IsRunning => _hookHandle != nint.Zero;
 
     public void Start()
@@ -77,10 +79,15 @@ internal sealed class MouseHookService : IDisposable
 
     private nint HookCallback(int nCode, nuint wParam, nint lParam)
     {
-        if (nCode >= 0 && !IsCurrentProcessForeground())
+        if (nCode >= 0)
         {
             NativeMethods.MsLlHookStruct hookStruct =
                 Marshal.PtrToStructure<NativeMethods.MsLlHookStruct>(lParam);
+
+            if (ShouldIgnorePoint?.Invoke(hookStruct.Pt.X, hookStruct.Pt.Y) == true)
+            {
+                return NativeMethods.CallNextHookEx(_hookHandle, nCode, wParam, lParam);
+            }
 
             MacroEvent? capturedEvent = TryCreateEvent((int)wParam, hookStruct);
             if (capturedEvent is not null)
@@ -122,17 +129,5 @@ internal sealed class MouseHookService : IDisposable
             hookStruct.Pt.Y,
             delta,
             TimeSpan.Zero);
-    }
-
-    private static bool IsCurrentProcessForeground()
-    {
-        nint foregroundWindow = NativeMethods.GetForegroundWindow();
-        if (foregroundWindow == nint.Zero)
-        {
-            return false;
-        }
-
-        NativeMethods.GetWindowThreadProcessId(foregroundWindow, out uint foregroundProcessId);
-        return foregroundProcessId == Environment.ProcessId;
     }
 }

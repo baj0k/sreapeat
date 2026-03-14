@@ -32,6 +32,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        _mouseHookService.ShouldIgnorePoint = IsPointInsideWindow;
         _mouseHookService.MouseActionCaptured += MouseHookService_OnMouseActionCaptured;
         SourceInitialized += MainWindow_OnSourceInitialized;
         Loaded += MainWindow_OnLoaded;
@@ -293,16 +294,19 @@ public partial class MainWindow : Window
 
         RecordToggleButton.IsEnabled = !_isPlaying;
         RecordToggleButton.IsChecked = _isRecording;
-        RecordButtonLabel.Text = _isRecording ? "Stop" : "Record";
 
         PlayButton.IsEnabled = !_isRecording && (_isPlaying || _recordedEvents.Count > 0);
-        PlayButtonLabel.Text = _isPlaying ? "Stop" : "Play";
+        PlayIcon.Visibility = _isPlaying ? Visibility.Collapsed : Visibility.Visible;
+        StopIcon.Visibility = _isPlaying ? Visibility.Visible : Visibility.Collapsed;
 
         LoopToggleButton.IsEnabled = !_isRecording && !_isPlaying;
-        LoopButtonLabel.Text = LoopToggleButton.IsChecked == true ? "Loop On" : "Loop Off";
 
         RepeatCountTextBox.IsEnabled = !_isRecording && !_isPlaying && LoopToggleButton.IsChecked != true;
         SpeedTextBox.IsEnabled = !_isRecording && !_isPlaying;
+
+        RecordToggleButton.ToolTip = _isRecording ? "Stop recording (F5)" : "Start recording (F5)";
+        PlayButton.ToolTip = _isPlaying ? "Stop playback (F6)" : "Play current macro (F6)";
+        LoopToggleButton.ToolTip = LoopToggleButton.IsChecked == true ? "Loop is on" : "Loop is off";
 
         _isUpdatingUi = false;
     }
@@ -402,13 +406,24 @@ public partial class MainWindow : Window
 
     private void UpdateShortcutLegend()
     {
-        string legend = "F5 record on/off | F6 play or stop";
+        string legend = "F5 Record    F6 Play/Stop";
         if (_unavailableHotkeys.Count > 0)
         {
-            legend += $" | Unavailable: {string.Join(", ", _unavailableHotkeys)}";
+            legend += $"    Unavailable: {string.Join(", ", _unavailableHotkeys)}";
         }
 
         ShortcutLegendTextBlock.Text = legend;
+    }
+
+    private bool IsPointInsideWindow(int x, int y)
+    {
+        nint handle = new WindowInteropHelper(this).Handle;
+        if (handle == nint.Zero || !NativeMethods.GetWindowRect(handle, out NativeMethods.Rect rect))
+        {
+            return false;
+        }
+
+        return x >= rect.Left && x < rect.Right && y >= rect.Top && y < rect.Bottom;
     }
 
     private void UpdateEventCount()
