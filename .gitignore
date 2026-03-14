@@ -9,6 +9,8 @@
 !/App.xaml.cs
 !/MainWindow.xaml
 !/MainWindow.xaml.cs
+!/Assets/
+!/Assets/**
 !/Helpers/
 !/Helpers/**
 !/Models/
