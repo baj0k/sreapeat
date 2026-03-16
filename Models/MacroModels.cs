@@ -20,4 +20,9 @@ internal sealed record MacroEvent(
     int Y,
     int Delta,
     TimeSpan DelayBeforeEvent,
-    uint VirtualKey = 0);
+    uint VirtualKey = 0,
+    ushort ScanCode = 0,
+    bool IsExtendedKey = false,
+    bool IsInjected = false);
+
+internal sealed record HotkeyBinding(string DisplayText, uint Modifiers, uint VirtualKey);

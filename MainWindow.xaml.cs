@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Globalization;
 using Microsoft.Win32;
 using System.Windows;
@@ -7,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media.Animation;
+using System.Windows.Media;
 using Sreapeat.Helpers;
 using Sreapeat.Models;
 using Sreapeat.Services;
@@ -15,10 +15,11 @@ namespace Sreapeat;
 
 public partial class MainWindow : Window
 {
-    private sealed record HotkeyBinding(string DisplayText, uint Modifiers, uint VirtualKey);
-
-    private const int HotkeyRecord = 1001;
-    private const int HotkeyPlay = 1002;
+    private const string AppTitle = "sreapeat";
+    private const string PlaybackErrorTitle = "sreapeat playback error";
+    private const string MacroFileFilter = "sreapeat macro (*.sreapeat.json)|*.sreapeat.json|JSON files (*.json)|*.json|All files (*.*)|*.*";
+    private const string MacroFileExtension = ".json";
+    private const string DefaultExportFileName = "macro.sreapeat.json";
     private const double CompactWindowWidth = 356;
     private const double CompactWindowMinWidth = 348;
     private const double CompactWindowHeight = 136;
@@ -31,36 +32,42 @@ public partial class MainWindow : Window
     private const int PaneAnimationMilliseconds = 140;
 
     private readonly KeyboardHookService _keyboardHookService = new();
+    private readonly MacroEventBuffer _macroEventBuffer = new();
     private readonly MouseHookService _mouseHookService = new();
     private readonly MacroFileService _macroFileService = new();
-    private readonly PlaybackService _playbackService = new();
-    private readonly Stopwatch _recordingStopwatch = new();
-    private readonly List<MacroEvent> _recordedEvents = [];
+    private readonly HotkeyManager _hotkeyManager;
+    private readonly MacroCoordinator _macroCoordinator;
+    private readonly MacroRuntimeSession _runtimeSession = new();
 
-    private CancellationTokenSource? _playbackCancellationTokenSource;
-    private readonly List<string> _unavailableHotkeys = [];
-    private readonly HotkeyBinding _defaultRecordHotkey = CreateHotkeyBinding(Key.F5, ModifierKeys.None);
-    private readonly HotkeyBinding _defaultPlayHotkey = CreateHotkeyBinding(Key.F6, ModifierKeys.None);
+    private readonly HotkeyBinding _defaultRecordHotkey = HotkeyService.CreateBinding(Key.F5, ModifierKeys.None);
+    private readonly HotkeyBinding _defaultPlayHotkey = HotkeyService.CreateBinding(Key.F6, ModifierKeys.None);
+    private readonly Brush _defaultShortcutBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#6B6559"));
+    private readonly Brush _unavailableShortcutBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#A14D4D"));
     private HwndSource? _windowSource;
-    private TimeSpan _lastRecordedOffset = TimeSpan.Zero;
-    private bool _isPlaying;
-    private bool _isRecording;
     private bool _isUpdatingUi;
     private bool _isSettingsOpen;
-    private bool _hotkeysTemporarilyDisabled;
-    private HotkeyBinding _recordHotkey;
-    private HotkeyBinding _playHotkey;
+    private bool _isClosing;
     private HotkeyBinding _draftRecordHotkey;
     private HotkeyBinding _draftPlayHotkey;
 
     public MainWindow()
     {
         InitializeComponent();
+        ApplyWindowMetrics(isExpanded: false, animate: false);
 
-        _recordHotkey = _defaultRecordHotkey;
-        _playHotkey = _defaultPlayHotkey;
-        _draftRecordHotkey = _recordHotkey;
-        _draftPlayHotkey = _playHotkey;
+        _hotkeyManager = new HotkeyManager(_defaultRecordHotkey, _defaultPlayHotkey);
+        _macroCoordinator = new MacroCoordinator(
+            _macroEventBuffer,
+            _runtimeSession,
+            _mouseHookService,
+            _keyboardHookService,
+            new PlaybackService(),
+            SuspendHotkeys,
+            ResumeHotkeys);
+        _draftRecordHotkey = _hotkeyManager.RecordHotkey;
+        _draftPlayHotkey = _hotkeyManager.PlayHotkey;
+        _defaultShortcutBrush.Freeze();
+        _unavailableShortcutBrush.Freeze();
 
         _keyboardHookService.KeyboardActionCaptured += KeyboardHookService_OnKeyboardActionCaptured;
         _mouseHookService.ShouldIgnorePoint = IsPointInsideWindow;
@@ -73,7 +80,7 @@ public partial class MainWindow : Window
     {
         _windowSource = (HwndSource?)PresentationSource.FromVisual(this);
         _windowSource?.AddHook(WndProc);
-        RegisterHotkeys();
+        RegisterHotkeys(resetUnavailableState: true);
     }
 
     private void MainWindow_OnLoaded(object sender, RoutedEventArgs e)
@@ -87,14 +94,17 @@ public partial class MainWindow : Window
         UpdateShortcutLegend();
         UpdateEventCount();
         UpdateUiState();
-        SetStatus("Ready...");
+        SetStatus(_hotkeyManager.UnavailableHotkeys.Count == 0
+            ? "Ready..."
+            : $"Hotkey unavailable: {string.Join(", ", _hotkeyManager.UnavailableHotkeys)}");
     }
 
     protected override void OnClosing(CancelEventArgs e)
     {
+        _isClosing = true;
         StopPlayback();
 
-        if (_isRecording)
+        if (_runtimeSession.IsRecording)
         {
             StopRecording();
         }
@@ -105,6 +115,7 @@ public partial class MainWindow : Window
         }
 
         UnregisterHotkeys();
+        _runtimeSession.Dispose();
         _keyboardHookService.Dispose();
         _mouseHookService.Dispose();
 
@@ -118,7 +129,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        RunSafeUiAction(StartRecording);
+        RunSafeUiAction("starting recording", StartRecording);
     }
 
     private void RecordToggleButton_OnUnchecked(object sender, RoutedEventArgs e)
@@ -128,12 +139,12 @@ public partial class MainWindow : Window
             return;
         }
 
-        RunSafeUiAction(StopRecording);
+        RunSafeUiAction("stopping recording", () => StopRecording());
     }
 
     private async void PlayButton_OnClick(object sender, RoutedEventArgs e)
     {
-        if (_isPlaying)
+        if (_runtimeSession.IsPlaying)
         {
             StopPlayback();
             return;
@@ -149,75 +160,53 @@ public partial class MainWindow : Window
 
     private void ImportButton_OnClick(object sender, RoutedEventArgs e)
     {
-        if (_isRecording || _isPlaying)
+        if (IsBusy)
         {
             return;
         }
 
-        if (_recordedEvents.Count > 0)
-        {
-            MessageBoxResult replaceExisting = MessageBox.Show(
+        if (_macroEventBuffer.HasEvents
+            && ShowAppMessage(
                 "Importing a macro replaces the current recorded events. Continue?",
-                "sreapeat",
                 MessageBoxButton.OKCancel,
-                MessageBoxImage.Question);
-
-            if (replaceExisting != MessageBoxResult.OK)
-            {
-                return;
-            }
-        }
-
-        OpenFileDialog openFileDialog = new()
-        {
-            Title = "Import macro",
-            Filter = "sreapeat macro (*.sreapeat.json)|*.sreapeat.json|JSON files (*.json)|*.json|All files (*.*)|*.*",
-            DefaultExt = ".json",
-            CheckFileExists = true,
-        };
-
-        if (openFileDialog.ShowDialog(this) != true)
+                MessageBoxImage.Question) != MessageBoxResult.OK)
         {
             return;
         }
 
-        RunSafeUiAction(() =>
+        string? filePath = SelectImportFile();
+        if (filePath is null)
         {
-            IReadOnlyList<MacroEvent> importedEvents = _macroFileService.Import(openFileDialog.FileName);
-            _recordedEvents.Clear();
-            _recordedEvents.AddRange(importedEvents);
+            return;
+        }
+
+        RunSafeUiAction("importing a macro", () =>
+        {
+            IReadOnlyList<MacroEvent> importedEvents = _macroFileService.Import(filePath);
+            _macroEventBuffer.ReplaceAll(importedEvents);
             UpdateEventCount();
             UpdateUiState();
-            SetStatus($"Imported {_recordedEvents.Count} event{(_recordedEvents.Count == 1 ? string.Empty : "s")}.");
+            SetStatus($"Imported {FormatEventCountLabel()}.");
         });
     }
 
     private void ExportButton_OnClick(object sender, RoutedEventArgs e)
     {
-        if (_isRecording || _isPlaying || _recordedEvents.Count == 0)
+        if (IsBusy || !_macroEventBuffer.HasEvents)
         {
             return;
         }
 
-        SaveFileDialog saveFileDialog = new()
-        {
-            Title = "Export macro",
-            Filter = "sreapeat macro (*.sreapeat.json)|*.sreapeat.json|JSON files (*.json)|*.json|All files (*.*)|*.*",
-            DefaultExt = ".json",
-            AddExtension = true,
-            FileName = "macro.sreapeat.json",
-            OverwritePrompt = true,
-        };
-
-        if (saveFileDialog.ShowDialog(this) != true)
+        string? filePath = SelectExportFile();
+        if (filePath is null)
         {
             return;
         }
 
-        RunSafeUiAction(() =>
+        RunSafeUiAction("exporting a macro", () =>
         {
-            _macroFileService.Export(saveFileDialog.FileName, _recordedEvents);
-            SetStatus($"Exported {_recordedEvents.Count} event{(_recordedEvents.Count == 1 ? string.Empty : "s")}.");
+            _macroFileService.Export(filePath, _macroEventBuffer.Events);
+            SetStatus($"Exported {FormatEventCountLabel()}.");
         });
     }
 
@@ -262,138 +251,70 @@ public partial class MainWindow : Window
 
     private void MouseHookService_OnMouseActionCaptured(object? sender, MacroEvent capturedEvent)
     {
-        if (!_isRecording)
+        if (!_runtimeSession.IsRecording)
         {
             return;
         }
 
         _ = Dispatcher.InvokeAsync(() =>
         {
-            if (!_isRecording)
+            if (_macroCoordinator.TryRecordMouseEvent(capturedEvent))
             {
-                return;
+                UpdateEventCount();
             }
-
-            TimeSpan currentOffset = _recordingStopwatch.Elapsed;
-            TimeSpan delay = currentOffset - _lastRecordedOffset;
-            _lastRecordedOffset = currentOffset;
-
-            _recordedEvents.Add(capturedEvent with { DelayBeforeEvent = delay });
-            UpdateEventCount();
         });
     }
 
     private void KeyboardHookService_OnKeyboardActionCaptured(object? sender, MacroEvent capturedEvent)
     {
-        if (!_isRecording)
+        if (!_runtimeSession.IsRecording && !_runtimeSession.UseHookBasedPlaybackStop)
         {
             return;
         }
 
         _ = Dispatcher.InvokeAsync(() =>
         {
-            if (!_isRecording)
+            switch (_macroCoordinator.HandleKeyboardCaptured(capturedEvent, _hotkeyManager.RecordHotkey, _hotkeyManager.PlayHotkey))
             {
-                return;
+                case KeyboardCaptureOutcome.StopPlayback:
+                    StopPlayback();
+                    break;
+                case KeyboardCaptureOutcome.StopRecording:
+                    StopRecording(trimTrailingShortcutEvents: true);
+                    break;
+                case KeyboardCaptureOutcome.EventRecorded:
+                    UpdateEventCount();
+                    break;
             }
-
-            TimeSpan currentOffset = _recordingStopwatch.Elapsed;
-            TimeSpan delay = currentOffset - _lastRecordedOffset;
-            _lastRecordedOffset = currentOffset;
-
-            _recordedEvents.Add(capturedEvent with { DelayBeforeEvent = delay });
-            UpdateEventCount();
         });
     }
 
     private void StartRecording()
     {
-        if (_isRecording || _isPlaying)
+        bool recordKeyboardActions = RecordKeyboardCheckBox.IsChecked == true;
+        if (!_macroCoordinator.StartRecording(recordKeyboardActions))
         {
             return;
         }
-
-        bool recordKeyboardActions = RecordKeyboardCheckBox.IsChecked == true;
-
-        _recordedEvents.Clear();
-        _lastRecordedOffset = TimeSpan.Zero;
-        _recordingStopwatch.Restart();
         UpdateEventCount();
-
-        if (recordKeyboardActions)
-        {
-            PauseHotkeysTemporarily();
-        }
-
-        try
-        {
-            _mouseHookService.Start();
-
-            if (recordKeyboardActions)
-            {
-                _keyboardHookService.Start();
-            }
-        }
-        catch
-        {
-            if (_keyboardHookService.IsRunning)
-            {
-                _keyboardHookService.Stop();
-            }
-
-            if (_mouseHookService.IsRunning)
-            {
-                _mouseHookService.Stop();
-            }
-
-            ResumeHotkeysIfNeeded();
-            throw;
-        }
-
-        _isRecording = true;
-
         UpdateUiState();
         SetStatus(recordKeyboardActions ? "Recording mouse + keyboard..." : "Recording...");
     }
 
-    private void StopRecording()
+    private void StopRecording(bool trimTrailingShortcutEvents = false)
     {
-        if (!_isRecording)
+        if (!_macroCoordinator.StopRecording(_hotkeyManager.RecordHotkey, trimTrailingShortcutEvents))
         {
             return;
         }
 
-        try
-        {
-            if (_keyboardHookService.IsRunning)
-            {
-                _keyboardHookService.Stop();
-            }
-
-            if (_mouseHookService.IsRunning)
-            {
-                _mouseHookService.Stop();
-            }
-        }
-        finally
-        {
-            ResumeHotkeysIfNeeded();
-            _recordingStopwatch.Stop();
-            _isRecording = false;
-        }
-
         UpdateUiState();
-        SetStatus(_recordedEvents.Count == 0 ? "Ready..." : "Recording saved.");
+        SetStatus(_macroEventBuffer.Count == 0 ? "Ready..." : "Recording saved.");
     }
 
     private async Task StartPlaybackAsync()
     {
-        if (_isPlaying || _isRecording)
-        {
-            return;
-        }
-
-        if (_recordedEvents.Count == 0)
+        if (!_macroEventBuffer.HasEvents)
         {
             SetStatus("Nothing to play.");
             return;
@@ -402,9 +323,8 @@ public partial class MainWindow : Window
         bool loopForever = LoopToggleButton.IsChecked == true;
         if (!TryGetRepeatCount(out int repeatCount))
         {
-            MessageBox.Show(
+            ShowAppMessage(
                 "Repeat count must be a whole number greater than zero.",
-                "sreapeat",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
             return;
@@ -412,88 +332,87 @@ public partial class MainWindow : Window
 
         if (!TryGetSpeedMultiplier(out double speedMultiplier))
         {
-            MessageBox.Show(
+            ShowAppMessage(
                 "Speed must be a number between 0.10 and 10.00.",
-                "sreapeat",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
             return;
         }
 
-        _playbackCancellationTokenSource = new CancellationTokenSource();
-        bool containsKeyboardEvents = ContainsKeyboardEvents();
-        if (containsKeyboardEvents)
+        PlaybackLaunchResult launchResult = _macroCoordinator.TryStartPlayback(repeatCount, loopForever, speedMultiplier);
+        if (launchResult.Failure is not null)
         {
-            PauseHotkeysTemporarily();
+            AppLogger.Error("Unable to prepare playback keyboard hook.", launchResult.Failure);
+            ShowAppMessage(
+                launchResult.Failure.Message,
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            SetStatus("Playback failed.");
+            return;
         }
 
-        _isPlaying = true;
-        UpdateUiState();
-
-        string hotkeyPauseText = containsKeyboardEvents ? " Hotkeys paused." : string.Empty;
-        SetStatus(loopForever
-            ? $"Playing in loop at {speedMultiplier:0.##}x...{hotkeyPauseText}"
-            : $"Playing {repeatCount} time(s) at {speedMultiplier:0.##}x...{hotkeyPauseText}");
-
-        bool cancelled = false;
-
-        try
-        {
-            await _playbackService.PlayAsync(
-                _recordedEvents,
-                repeatCount,
-                loopForever,
-                speedMultiplier,
-                _playbackCancellationTokenSource.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            cancelled = true;
-        }
-        finally
-        {
-            _playbackCancellationTokenSource?.Dispose();
-            _playbackCancellationTokenSource = null;
-            _isPlaying = false;
-            ResumeHotkeysIfNeeded();
-            UpdateUiState();
-            SetStatus(cancelled ? "Playback stopped." : "Ready...");
-        }
-    }
-
-    private void StopPlayback()
-    {
-        if (!_isPlaying)
+        if (!launchResult.Started || launchResult.PlaybackTask is null)
         {
             return;
         }
 
-        _playbackCancellationTokenSource?.Cancel();
+        UpdateUiState();
+
+        SetStatus(loopForever
+            ? $"Playing in loop at {speedMultiplier:0.##}x..."
+            : $"Playing {repeatCount} time(s) at {speedMultiplier:0.##}x...");
+
+        PlaybackRunResult playbackResult = await launchResult.PlaybackTask;
+        UpdateUiState();
+
+        if (playbackResult.Status == PlaybackRunStatus.Failed && playbackResult.Failure is not null)
+        {
+            AppLogger.Error("Playback failed.", playbackResult.Failure);
+            ShowAppMessage(
+                playbackResult.Failure.Message,
+                MessageBoxButton.OK,
+                MessageBoxImage.Error,
+                PlaybackErrorTitle);
+            SetStatus("Playback failed.");
+            return;
+        }
+
+        SetStatus(playbackResult.Status == PlaybackRunStatus.Cancelled ? "Playback stopped." : "Ready...");
+    }
+
+    private void StopPlayback()
+    {
+        if (!_runtimeSession.IsPlaying)
+        {
+            return;
+        }
+
+        _macroCoordinator.StopPlayback();
     }
 
     private void UpdateUiState()
     {
         _isUpdatingUi = true;
 
-        RecordToggleButton.IsEnabled = !_isPlaying;
-        RecordToggleButton.IsChecked = _isRecording;
-        RecordIcon.Visibility = _isRecording ? Visibility.Collapsed : Visibility.Visible;
-        RecordStopIcon.Visibility = _isRecording ? Visibility.Visible : Visibility.Collapsed;
+        RecordToggleButton.IsEnabled = !_runtimeSession.IsPlaying;
+        RecordToggleButton.IsChecked = _runtimeSession.IsRecording;
+        RecordIcon.Visibility = _runtimeSession.IsRecording ? Visibility.Collapsed : Visibility.Visible;
+        RecordStopIcon.Visibility = _runtimeSession.IsRecording ? Visibility.Visible : Visibility.Collapsed;
 
-        PlayButton.IsEnabled = !_isRecording && (_isPlaying || _recordedEvents.Count > 0);
-        PlayIcon.Visibility = _isPlaying ? Visibility.Collapsed : Visibility.Visible;
-        StopIcon.Visibility = _isPlaying ? Visibility.Visible : Visibility.Collapsed;
+        PlayButton.IsEnabled = !_runtimeSession.IsRecording && (_runtimeSession.IsPlaying || _macroEventBuffer.HasEvents);
+        PlayIcon.Visibility = _runtimeSession.IsPlaying ? Visibility.Collapsed : Visibility.Visible;
+        StopIcon.Visibility = _runtimeSession.IsPlaying ? Visibility.Visible : Visibility.Collapsed;
 
-        LoopToggleButton.IsEnabled = !_isRecording && !_isPlaying;
+        LoopToggleButton.IsEnabled = !_runtimeSession.IsRecording && !_runtimeSession.IsPlaying;
 
-        RepeatCountTextBox.IsEnabled = !_isRecording && !_isPlaying && LoopToggleButton.IsChecked != true;
-        SpeedTextBox.IsEnabled = !_isRecording && !_isPlaying;
-        RecordKeyboardCheckBox.IsEnabled = !_isRecording && !_isPlaying;
-        ImportButton.IsEnabled = !_isRecording && !_isPlaying;
-        ExportButton.IsEnabled = !_isRecording && !_isPlaying && _recordedEvents.Count > 0;
+        RepeatCountTextBox.IsEnabled = !_runtimeSession.IsRecording && !_runtimeSession.IsPlaying && LoopToggleButton.IsChecked != true;
+        SpeedTextBox.IsEnabled = !_runtimeSession.IsRecording && !_runtimeSession.IsPlaying;
+        RecordKeyboardCheckBox.IsEnabled = !IsBusy;
+        ImportButton.IsEnabled = !IsBusy;
+        ExportButton.IsEnabled = !IsBusy && _macroEventBuffer.HasEvents;
 
-        RecordToggleButton.ToolTip = _isRecording ? $"Stop recording ({_recordHotkey.DisplayText})" : $"Start recording ({_recordHotkey.DisplayText})";
-        PlayButton.ToolTip = _isPlaying ? $"Stop playback ({_playHotkey.DisplayText})" : $"Play current macro ({_playHotkey.DisplayText})";
+        RecordToggleButton.ToolTip = _runtimeSession.IsRecording ? $"Stop recording ({_hotkeyManager.RecordHotkey.DisplayText})" : $"Start recording ({_hotkeyManager.RecordHotkey.DisplayText})";
+        PlayButton.ToolTip = _runtimeSession.IsPlaying ? $"Stop playback ({_hotkeyManager.PlayHotkey.DisplayText})" : $"Play current macro ({_hotkeyManager.PlayHotkey.DisplayText})";
         LoopToggleButton.ToolTip = LoopToggleButton.IsChecked == true ? "Loop is on" : "Loop is off";
         SettingsButton.ToolTip = _isSettingsOpen ? "Hide settings" : "Show settings";
 
@@ -529,18 +448,18 @@ public partial class MainWindow : Window
 
     private nint WndProc(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
     {
-        if (msg != NativeMethods.WmHotKey)
+        if (msg == NativeMethods.WmHotKey && _hotkeyManager.AreSuspended)
         {
+            handled = true;
             return nint.Zero;
         }
 
-        int hotkeyId = wParam.ToInt32();
-        switch (hotkeyId)
+        switch (_hotkeyManager.GetCommand(msg, wParam))
         {
-            case HotkeyRecord:
-                if (_isRecording)
+            case HotkeyCommand.ToggleRecord:
+                if (_runtimeSession.IsRecording)
                 {
-                    StopRecording();
+                    StopRecording(trimTrailingShortcutEvents: false);
                 }
                 else
                 {
@@ -549,12 +468,12 @@ public partial class MainWindow : Window
 
                 handled = true;
                 break;
-            case HotkeyPlay:
-                if (_isPlaying)
+            case HotkeyCommand.TogglePlay:
+                if (_runtimeSession.IsPlaying)
                 {
                     StopPlayback();
                 }
-                else if (!_isRecording)
+                else if (!_runtimeSession.IsRecording)
                 {
                     _ = StartPlaybackAsync();
                 }
@@ -566,31 +485,38 @@ public partial class MainWindow : Window
         return nint.Zero;
     }
 
-    private void RegisterHotkeys()
+    private void RegisterHotkeys(bool resetUnavailableState = false)
     {
-        nint handle = new WindowInteropHelper(this).Handle;
-
-        TryRegisterHotkey(handle, HotkeyRecord, _recordHotkey);
-        TryRegisterHotkey(handle, HotkeyPlay, _playHotkey);
-    }
-
-    private void TryRegisterHotkey(nint handle, int id, HotkeyBinding binding)
-    {
-        bool succeeded = NativeMethods.RegisterHotKey(handle, id, binding.Modifiers, binding.VirtualKey);
-        if (succeeded)
-        {
-            return;
-        }
-
-        _unavailableHotkeys.Add(binding.DisplayText);
+        IReadOnlyList<string> unavailableHotkeys = _hotkeyManager.RegisterAll(GetWindowHandle(), resetUnavailableState);
+        LogUnavailableHotkeys(unavailableHotkeys);
         UpdateShortcutLegend();
     }
 
     private void UnregisterHotkeys()
     {
-        nint handle = new WindowInteropHelper(this).Handle;
-        NativeMethods.UnregisterHotKey(handle, HotkeyRecord);
-        NativeMethods.UnregisterHotKey(handle, HotkeyPlay);
+        _hotkeyManager.UnregisterAll(GetWindowHandle());
+    }
+
+    private void SuspendHotkeys()
+    {
+        _hotkeyManager.Suspend(GetWindowHandle());
+    }
+
+    private void ResumeHotkeys()
+    {
+        if (!_hotkeyManager.AreSuspended)
+        {
+            return;
+        }
+
+        if (_isClosing)
+        {
+            return;
+        }
+
+        IReadOnlyList<string> unavailableHotkeys = _hotkeyManager.Resume(GetWindowHandle(), resetUnavailableState: true);
+        LogUnavailableHotkeys(unavailableHotkeys);
+        UpdateShortcutLegend();
     }
 
     private void SetSettingsPaneOpen(bool isOpen)
@@ -604,21 +530,19 @@ public partial class MainWindow : Window
 
         if (isOpen)
         {
-            _draftRecordHotkey = _recordHotkey;
-            _draftPlayHotkey = _playHotkey;
+            _draftRecordHotkey = _hotkeyManager.RecordHotkey;
+            _draftPlayHotkey = _hotkeyManager.PlayHotkey;
             RefreshShortcutEditorText();
 
             SettingsPane.Visibility = Visibility.Visible;
             SettingsPane.IsHitTestVisible = true;
             SettingsPaneColumn.Width = GridLength.Auto;
-            MinWidth = ExpandedWindowMinWidth;
-            MinHeight = ExpandedWindowMinHeight;
 
             AnimatePane(
                 targetWidth: SettingsPaneOpenWidth,
                 targetOpacity: 1.0,
                 onCompleted: null);
-            AnimateWindowSize(ExpandedWindowWidth, ExpandedWindowHeight);
+            ApplyWindowMetrics(isExpanded: true, animate: true);
 
             _ = Dispatcher.InvokeAsync(() =>
             {
@@ -634,8 +558,6 @@ public partial class MainWindow : Window
             }
 
             SettingsPane.IsHitTestVisible = false;
-            MinWidth = CompactWindowMinWidth;
-            MinHeight = CompactWindowMinHeight;
 
             AnimatePane(
                 targetWidth: 0,
@@ -650,7 +572,7 @@ public partial class MainWindow : Window
                     SettingsPane.Visibility = Visibility.Collapsed;
                     SettingsPaneColumn.Width = new GridLength(0);
                 });
-            AnimateWindowSize(CompactWindowWidth, CompactWindowHeight);
+            ApplyWindowMetrics(isExpanded: false, animate: true);
         }
 
         UpdateUiState();
@@ -681,43 +603,36 @@ public partial class MainWindow : Window
         BeginAnimation(HeightProperty, CreateAnimation(targetHeight));
     }
 
+    private void ApplyWindowMetrics(bool isExpanded, bool animate)
+    {
+        double targetWidth = isExpanded ? ExpandedWindowWidth : CompactWindowWidth;
+        double targetHeight = isExpanded ? ExpandedWindowHeight : CompactWindowHeight;
+
+        MinWidth = isExpanded ? ExpandedWindowMinWidth : CompactWindowMinWidth;
+        MinHeight = isExpanded ? ExpandedWindowMinHeight : CompactWindowMinHeight;
+
+        if (animate)
+        {
+            AnimateWindowSize(targetWidth, targetHeight);
+            return;
+        }
+
+        Width = targetWidth;
+        Height = targetHeight;
+    }
+
     private void RefreshShortcutEditorText()
     {
         RecordHotkeyTextBox.Text = _draftRecordHotkey.DisplayText;
         PlayHotkeyTextBox.Text = _draftPlayHotkey.DisplayText;
     }
 
-    private void PauseHotkeysTemporarily()
-    {
-        if (_hotkeysTemporarilyDisabled)
-        {
-            return;
-        }
-
-        UnregisterHotkeys();
-        _unavailableHotkeys.Clear();
-        UpdateShortcutLegend();
-        _hotkeysTemporarilyDisabled = true;
-    }
-
-    private void ResumeHotkeysIfNeeded()
-    {
-        if (!_hotkeysTemporarilyDisabled)
-        {
-            return;
-        }
-
-        _unavailableHotkeys.Clear();
-        RegisterHotkeys();
-        UpdateShortcutLegend();
-        _hotkeysTemporarilyDisabled = false;
-    }
-
     private void CaptureShortcut(KeyEventArgs e, bool isRecordField)
     {
         e.Handled = true;
 
-        if (!TryCreateHotkeyBinding(e, out HotkeyBinding binding))
+        Key key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (!HotkeyService.TryCreateBinding(key, Keyboard.Modifiers, out HotkeyBinding binding))
         {
             SetStatus("Shortcut must include a non-modifier key.");
             return;
@@ -738,11 +653,11 @@ public partial class MainWindow : Window
         {
             if (isRecordField)
             {
-                _draftRecordHotkey = _recordHotkey;
+                _draftRecordHotkey = _hotkeyManager.RecordHotkey;
             }
             else
             {
-                _draftPlayHotkey = _playHotkey;
+                _draftPlayHotkey = _hotkeyManager.PlayHotkey;
             }
 
             RefreshShortcutEditorText();
@@ -761,28 +676,41 @@ public partial class MainWindow : Window
             return false;
         }
 
-        UnregisterHotkeys();
-        _unavailableHotkeys.Clear();
-        _recordHotkey = _draftRecordHotkey;
-        _playHotkey = _draftPlayHotkey;
-        RegisterHotkeys();
+        IReadOnlyList<string> unavailableHotkeys = _hotkeyManager.UpdateBindings(GetWindowHandle(), _draftRecordHotkey, _draftPlayHotkey);
+        LogUnavailableHotkeys(unavailableHotkeys);
         RefreshShortcutEditorText();
         UpdateShortcutLegend();
         UpdateUiState();
-        SetStatus(_unavailableHotkeys.Count == 0 ? "Shortcuts updated." : "Some shortcuts are unavailable.");
+        SetStatus(_hotkeyManager.UnavailableHotkeys.Count == 0 ? "Shortcuts updated." : "Some shortcuts are unavailable.");
         return true;
-    }
-
-    private bool ContainsKeyboardEvents()
-    {
-        return _recordedEvents.Any(static recordedEvent =>
-            recordedEvent.Type is MacroEventType.KeyDown or MacroEventType.KeyUp);
     }
 
     private void UpdateShortcutLegend()
     {
-        RecordShortcutTextBlock.Text = _recordHotkey.DisplayText;
-        PlayShortcutTextBlock.Text = _playHotkey.DisplayText;
+        bool recordUnavailable = _hotkeyManager.IsUnavailable(_hotkeyManager.RecordHotkey);
+        bool playUnavailable = _hotkeyManager.IsUnavailable(_hotkeyManager.PlayHotkey);
+
+        RecordShortcutTextBlock.Text = recordUnavailable
+            ? $"{_hotkeyManager.RecordHotkey.DisplayText}*"
+            : _hotkeyManager.RecordHotkey.DisplayText;
+        PlayShortcutTextBlock.Text = playUnavailable
+            ? $"{_hotkeyManager.PlayHotkey.DisplayText}*"
+            : _hotkeyManager.PlayHotkey.DisplayText;
+        RecordShortcutTextBlock.Foreground = recordUnavailable ? _unavailableShortcutBrush : _defaultShortcutBrush;
+        PlayShortcutTextBlock.Foreground = playUnavailable ? _unavailableShortcutBrush : _defaultShortcutBrush;
+    }
+
+    private nint GetWindowHandle()
+    {
+        return new WindowInteropHelper(this).Handle;
+    }
+
+    private static void LogUnavailableHotkeys(IEnumerable<string> unavailableHotkeys)
+    {
+        foreach (string hotkey in unavailableHotkeys)
+        {
+            AppLogger.Warning($"Unable to register hotkey '{hotkey}'.");
+        }
     }
 
     private bool IsPointInsideWindow(int x, int y)
@@ -798,9 +726,7 @@ public partial class MainWindow : Window
 
     private void UpdateEventCount()
     {
-        EventCountTextBlock.Text = _recordedEvents.Count == 1
-            ? "1 event"
-            : $"{_recordedEvents.Count} events";
+        EventCountTextBlock.Text = FormatEventCountLabel();
     }
 
     private void SetStatus(string status)
@@ -808,7 +734,55 @@ public partial class MainWindow : Window
         StatusTextBlock.Text = status;
     }
 
-    private void RunSafeUiAction(Action action)
+    private bool IsBusy => _runtimeSession.IsRecording || _runtimeSession.IsPlaying;
+
+    private string FormatEventCountLabel()
+    {
+        return _macroEventBuffer.CountLabel;
+    }
+
+    private string? SelectImportFile()
+    {
+        OpenFileDialog openFileDialog = new()
+        {
+            Title = "Import macro",
+            Filter = MacroFileFilter,
+            DefaultExt = MacroFileExtension,
+            CheckFileExists = true,
+        };
+
+        return openFileDialog.ShowDialog(this) == true
+            ? openFileDialog.FileName
+            : null;
+    }
+
+    private string? SelectExportFile()
+    {
+        SaveFileDialog saveFileDialog = new()
+        {
+            Title = "Export macro",
+            Filter = MacroFileFilter,
+            DefaultExt = MacroFileExtension,
+            AddExtension = true,
+            FileName = DefaultExportFileName,
+            OverwritePrompt = true,
+        };
+
+        return saveFileDialog.ShowDialog(this) == true
+            ? saveFileDialog.FileName
+            : null;
+    }
+
+    private MessageBoxResult ShowAppMessage(
+        string message,
+        MessageBoxButton buttons,
+        MessageBoxImage image,
+        string title = AppTitle)
+    {
+        return MessageBox.Show(this, message, title, buttons, image);
+    }
+
+    private void RunSafeUiAction(string operation, Action action)
     {
         try
         {
@@ -816,9 +790,9 @@ public partial class MainWindow : Window
         }
         catch (Exception exception)
         {
-            MessageBox.Show(
+            AppLogger.Error($"Failed while {operation}.", exception);
+            ShowAppMessage(
                 exception.Message,
-                "sreapeat",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
 
@@ -826,156 +800,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private static bool TryCreateHotkeyBinding(KeyEventArgs e, out HotkeyBinding binding)
-    {
-        Key key = e.Key == Key.System ? e.SystemKey : e.Key;
-        if (IsModifierKey(key))
-        {
-            binding = CreateHotkeyBinding(Key.F5, ModifierKeys.None);
-            return false;
-        }
-
-        ModifierKeys modifiers = Keyboard.Modifiers;
-        binding = CreateHotkeyBinding(key, modifiers);
-        return true;
-    }
-
-    private static HotkeyBinding CreateHotkeyBinding(Key key, ModifierKeys modifiers)
-    {
-        return new HotkeyBinding(
-            FormatHotkeyText(modifiers, key),
-            ConvertModifiers(modifiers),
-            (uint)KeyInterop.VirtualKeyFromKey(key));
-    }
-
-    private static uint ConvertModifiers(ModifierKeys modifiers)
-    {
-        uint nativeModifiers = 0;
-
-        if (modifiers.HasFlag(ModifierKeys.Alt))
-        {
-            nativeModifiers |= NativeMethods.ModAlt;
-        }
-
-        if (modifiers.HasFlag(ModifierKeys.Control))
-        {
-            nativeModifiers |= NativeMethods.ModControl;
-        }
-
-        if (modifiers.HasFlag(ModifierKeys.Shift))
-        {
-            nativeModifiers |= NativeMethods.ModShift;
-        }
-
-        if (modifiers.HasFlag(ModifierKeys.Windows))
-        {
-            nativeModifiers |= NativeMethods.ModWin;
-        }
-
-        return nativeModifiers;
-    }
-
-    private static string FormatHotkeyText(ModifierKeys modifiers, Key key)
-    {
-        List<string> parts = [];
-
-        if (modifiers.HasFlag(ModifierKeys.Control))
-        {
-            parts.Add("Ctrl");
-        }
-
-        if (modifiers.HasFlag(ModifierKeys.Shift))
-        {
-            parts.Add("Shift");
-        }
-
-        if (modifiers.HasFlag(ModifierKeys.Alt))
-        {
-            parts.Add("Alt");
-        }
-
-        if (modifiers.HasFlag(ModifierKeys.Windows))
-        {
-            parts.Add("Win");
-        }
-
-        parts.Add(FormatKeyLabel(key));
-        return string.Join(" + ", parts);
-    }
-
-    private static string FormatKeyLabel(Key key)
-    {
-        if (key >= Key.A && key <= Key.Z)
-        {
-            return key.ToString();
-        }
-
-        if (key >= Key.D0 && key <= Key.D9)
-        {
-            return ((char)('0' + ((int)key - (int)Key.D0))).ToString();
-        }
-
-        if (key >= Key.F1 && key <= Key.F24)
-        {
-            return key.ToString();
-        }
-
-        if (key >= Key.NumPad0 && key <= Key.NumPad9)
-        {
-            return $"Num {(char)('0' + ((int)key - (int)Key.NumPad0))}";
-        }
-
-        return key switch
-        {
-            Key.Escape => "Esc",
-            Key.Return => "Enter",
-            Key.Space => "Space",
-            Key.Tab => "Tab",
-            Key.Back => "Backspace",
-            Key.Delete => "Delete",
-            Key.Insert => "Insert",
-            Key.Home => "Home",
-            Key.End => "End",
-            Key.Prior => "PgUp",
-            Key.Next => "PgDn",
-            Key.Left => "Left",
-            Key.Right => "Right",
-            Key.Up => "Up",
-            Key.Down => "Down",
-            Key.Snapshot => "PrintScreen",
-            Key.OemPlus => "+",
-            Key.OemMinus => "-",
-            Key.OemComma => ",",
-            Key.OemPeriod => ".",
-            Key.OemQuestion => "/",
-            Key.OemSemicolon => ";",
-            Key.OemQuotes => "'",
-            Key.OemOpenBrackets => "[",
-            Key.Oem6 => "]",
-            Key.Oem5 => "\\",
-            Key.Oem3 => "`",
-            _ => ConvertKeyWithFallback(key),
-        };
-    }
-
-    private static string ConvertKeyWithFallback(Key key)
-    {
-        KeyConverter converter = new();
-        return converter.ConvertToString(key) as string ?? key.ToString();
-    }
-
-    private static bool IsModifierKey(Key key)
-    {
-        return key is Key.LeftCtrl
-            or Key.RightCtrl
-            or Key.LeftShift
-            or Key.RightShift
-            or Key.LeftAlt
-            or Key.RightAlt
-            or Key.LWin
-            or Key.RWin
-            or Key.System;
-    }
 
     private static DoubleAnimation CreateAnimation(double targetValue)
     {

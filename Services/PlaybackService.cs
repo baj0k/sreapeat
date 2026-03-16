@@ -1,10 +1,25 @@
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using Sreapeat.Helpers;
 using Sreapeat.Models;
 
 namespace Sreapeat.Services;
 
-internal sealed class PlaybackService
+internal static class PlaybackTiming
+{
+    public static TimeSpan ScaleDelay(TimeSpan originalDelay, double speedMultiplier)
+    {
+        double scaledTicks = originalDelay.Ticks / speedMultiplier;
+        if (scaledTicks <= 1)
+        {
+            return TimeSpan.Zero;
+        }
+
+        return TimeSpan.FromTicks((long)scaledTicks);
+    }
+}
+
+internal sealed class PlaybackService : IPlaybackService
 {
     public async Task PlayAsync(
         IReadOnlyList<MacroEvent> events,
@@ -26,7 +41,7 @@ internal sealed class PlaybackService
             {
                 if (macroEvent.DelayBeforeEvent > TimeSpan.Zero)
                 {
-                    TimeSpan scaledDelay = ScaleDelay(macroEvent.DelayBeforeEvent, speedMultiplier);
+                    TimeSpan scaledDelay = PlaybackTiming.ScaleDelay(macroEvent.DelayBeforeEvent, speedMultiplier);
                     if (scaledDelay > TimeSpan.Zero)
                     {
                         await Task.Delay(scaledDelay, cancellationToken);
@@ -44,26 +59,38 @@ internal sealed class PlaybackService
         }
     }
 
-    private static TimeSpan ScaleDelay(TimeSpan originalDelay, double speedMultiplier)
-    {
-        double scaledTicks = originalDelay.Ticks / speedMultiplier;
-        if (scaledTicks <= 1)
-        {
-            return TimeSpan.Zero;
-        }
-
-        return TimeSpan.FromTicks((long)scaledTicks);
-    }
-
     private static void Execute(MacroEvent macroEvent)
     {
         if (IsMouseEvent(macroEvent.Type))
         {
-            NativeMethods.SetCursorPos(macroEvent.X, macroEvent.Y);
+            if (!NativeMethods.SetCursorPos(macroEvent.X, macroEvent.Y))
+            {
+                throw new Win32Exception(
+                    Marshal.GetLastWin32Error(),
+                    "Unable to move the mouse cursor during playback.");
+            }
         }
 
         if (macroEvent.Type is MacroEventType.KeyDown or MacroEventType.KeyUp)
         {
+            bool useScanCode = macroEvent.ScanCode != 0;
+            uint keyFlags = 0;
+
+            if (useScanCode)
+            {
+                keyFlags |= NativeMethods.KeyEventFScancode;
+            }
+
+            if (macroEvent.IsExtendedKey)
+            {
+                keyFlags |= NativeMethods.KeyEventFExtendedKey;
+            }
+
+            if (macroEvent.Type == MacroEventType.KeyUp)
+            {
+                keyFlags |= NativeMethods.KeyEventFKeyUp;
+            }
+
             NativeMethods.Input keyboardInput = new()
             {
                 Type = NativeMethods.InputKeyboard,
@@ -71,15 +98,14 @@ internal sealed class PlaybackService
                 {
                     KeyboardInput = new NativeMethods.KeyboardInput
                     {
-                        WVk = (ushort)macroEvent.VirtualKey,
-                        DwFlags = macroEvent.Type == MacroEventType.KeyUp
-                            ? NativeMethods.KeyEventFKeyUp
-                            : 0,
+                        WVk = useScanCode ? (ushort)0 : (ushort)macroEvent.VirtualKey,
+                        WScan = macroEvent.ScanCode,
+                        DwFlags = keyFlags,
                     },
                 },
             };
 
-            NativeMethods.SendInput(1, [keyboardInput], Marshal.SizeOf<NativeMethods.Input>());
+            SendSingleInput(keyboardInput, "Unable to send a keyboard event during playback.");
             return;
         }
 
@@ -116,7 +142,18 @@ internal sealed class PlaybackService
             },
         };
 
-        NativeMethods.SendInput(1, [input], Marshal.SizeOf<NativeMethods.Input>());
+        SendSingleInput(input, "Unable to send a mouse event during playback.");
+    }
+
+    private static void SendSingleInput(NativeMethods.Input input, string errorMessage)
+    {
+        uint sent = NativeMethods.SendInput(1, [input], Marshal.SizeOf<NativeMethods.Input>());
+        if (sent == 1)
+        {
+            return;
+        }
+
+        throw new Win32Exception(Marshal.GetLastWin32Error(), errorMessage);
     }
 
     private static bool IsMouseEvent(MacroEventType eventType)

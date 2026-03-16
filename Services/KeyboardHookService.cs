@@ -5,7 +5,7 @@ using Sreapeat.Models;
 
 namespace Sreapeat.Services;
 
-internal sealed class KeyboardHookService : IDisposable
+internal sealed class KeyboardHookService : IHookService, IDisposable
 {
     private readonly NativeMethods.HookProc _hookCallback;
     private nint _hookHandle;
@@ -114,6 +114,9 @@ internal sealed class KeyboardHookService : IDisposable
             0,
             0,
             TimeSpan.Zero,
-            hookStruct.VkCode);
+            hookStruct.VkCode,
+            (ushort)hookStruct.ScanCode,
+            (hookStruct.Flags & NativeMethods.LlkhfExtended) != 0,
+            (hookStruct.Flags & NativeMethods.LlkhfInjected) != 0);
     }
 }

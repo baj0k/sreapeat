@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore .\tests\Sreapeat.Tests\Sreapeat.Tests.csproj
+
+      - name: Build app
+        run: dotnet build .\sreapeat.csproj -c Release --no-restore
+
+      - name: Run tests
+        run: dotnet test .\tests\Sreapeat.Tests\Sreapeat.Tests.csproj -c Release --no-build --no-restore

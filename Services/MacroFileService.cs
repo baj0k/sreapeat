@@ -33,6 +33,8 @@ internal sealed class MacroFileService
                     Delta = macroEvent.Delta,
                     DelayMilliseconds = macroEvent.DelayBeforeEvent.TotalMilliseconds,
                     VirtualKey = macroEvent.VirtualKey,
+                    ScanCode = macroEvent.ScanCode,
+                    IsExtendedKey = macroEvent.IsExtendedKey,
                 })
                 .ToList(),
         };
@@ -74,7 +76,9 @@ internal sealed class MacroFileService
                 storedEvent.Y,
                 storedEvent.Delta,
                 TimeSpan.FromMilliseconds(storedEvent.DelayMilliseconds),
-                storedEvent.VirtualKey);
+                storedEvent.VirtualKey,
+                storedEvent.ScanCode,
+                storedEvent.IsExtendedKey);
         }).ToList();
     }
 
@@ -100,5 +104,9 @@ internal sealed class MacroFileService
         public double DelayMilliseconds { get; init; }
 
         public uint VirtualKey { get; init; }
+
+        public ushort ScanCode { get; init; }
+
+        public bool IsExtendedKey { get; init; }
     }
 }

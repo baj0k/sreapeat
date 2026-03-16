@@ -28,6 +28,9 @@ internal static class NativeMethods
 
     internal const uint InputMouse = 0;
     internal const uint InputKeyboard = 1;
+    internal const uint KeyEventFExtendedKey = 0x0001;
+    internal const uint KeyEventFKeyUp = 0x0002;
+    internal const uint KeyEventFScancode = 0x0008;
     internal const uint MouseEventFLeftDown = 0x0002;
     internal const uint MouseEventFLeftUp = 0x0004;
     internal const uint MouseEventFRightDown = 0x0008;
@@ -35,7 +38,8 @@ internal static class NativeMethods
     internal const uint MouseEventFMiddleDown = 0x0020;
     internal const uint MouseEventFMiddleUp = 0x0040;
     internal const uint MouseEventFWheel = 0x0800;
-    internal const uint KeyEventFKeyUp = 0x0002;
+    internal const uint LlkhfExtended = 0x01;
+    internal const uint LlkhfInjected = 0x10;
 
     internal delegate nint HookProc(int nCode, nuint wParam, nint lParam);
 
@@ -140,12 +144,6 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool UnregisterHotKey(nint hWnd, int id);
-
-    [DllImport("user32.dll")]
-    internal static extern nint GetForegroundWindow();
-
-    [DllImport("user32.dll")]
-    internal static extern uint GetWindowThreadProcessId(nint hWnd, out uint lpdwProcessId);
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

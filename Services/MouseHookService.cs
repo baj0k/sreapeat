@@ -5,7 +5,7 @@ using Sreapeat.Models;
 
 namespace Sreapeat.Services;
 
-internal sealed class MouseHookService : IDisposable
+internal sealed class MouseHookService : IHookService, IDisposable
 {
     private readonly NativeMethods.HookProc _hookCallback;
     private nint _hookHandle;
