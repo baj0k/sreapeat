@@ -4,9 +4,9 @@
         Title="sreapeat"
         Icon="Assets/AppIcon.ico"
         Width="356"
-        Height="144"
+        Height="136"
         MinWidth="348"
-        MinHeight="140"
+        MinHeight="132"
         WindowStartupLocation="CenterScreen"
         Background="#F1EFE7">
     <Window.Resources>
@@ -112,59 +112,27 @@
     </Window.Resources>
 
     <DockPanel LastChildFill="True">
-        <Grid DockPanel.Dock="Top"
-              Margin="8,2,8,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-
-            <TextBlock x:Name="ShortcutLegendTextBlock"
-                       Margin="0,5,0,0"
-                       FontSize="8"
-                       Foreground="#6B6559"
-                       TextAlignment="Center"
-                       HorizontalAlignment="Stretch"
-                       Text="F5 Record    F6 Play/Stop" />
-
-            <Button x:Name="SettingsButton"
-                    Grid.Column="1"
-                    Width="26"
-                    Height="26"
-                    Margin="8,0,0,0"
-                    Style="{StaticResource IconButtonStyle}"
-                    Click="SettingsButton_OnClick"
-                    ToolTip="Settings">
-                <TextBlock FontFamily="Segoe MDL2 Assets"
-                           FontSize="14"
-                           Foreground="#5C564A"
-                           Text="&#xE713;"
-                           HorizontalAlignment="Center"
-                           VerticalAlignment="Center" />
-            </Button>
-        </Grid>
-
         <Grid DockPanel.Dock="Bottom"
-              Margin="0,4,0,0"
+              Margin="0,2,0,0"
               Background="#F6F4ED">
             <Border BorderBrush="#D8D3C6"
                     BorderThickness="0,1,0,0"
-                    Padding="8,2">
+                    Padding="8,1">
                 <DockPanel>
                     <TextBlock x:Name="StatusTextBlock"
                                DockPanel.Dock="Left"
-                               FontSize="11"
+                               FontSize="10"
                                Text="Ready..." />
                     <TextBlock x:Name="EventCountTextBlock"
                                DockPanel.Dock="Right"
-                               FontSize="11"
+                               FontSize="10"
                                Foreground="#6B6559"
                                Text="0 events" />
                 </DockPanel>
             </Border>
         </Grid>
 
-        <Grid Margin="10,4,10,0"
+        <Grid Margin="8,0,8,0"
               VerticalAlignment="Center"
               ClipToBounds="True">
             <Grid.ColumnDefinitions>
@@ -177,55 +145,94 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="16" />
-                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="10" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Orientation="Horizontal"
                             Grid.Column="0"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Center">
-                    <Button x:Name="PlayButton"
-                            Style="{StaticResource IconButtonStyle}"
-                            Click="PlayButton_OnClick"
-                            ToolTip="Play or stop the current macro">
-                        <Grid Width="24"
-                              Height="24"
-                              HorizontalAlignment="Center"
-                              VerticalAlignment="Center">
-                            <Polygon x:Name="PlayIcon"
-                                     Points="4,2 20,12 4,22"
-                                     Fill="#91C433"
-                                     Stroke="#6A8D23"
-                                     StrokeThickness="1.2" />
-                            <Rectangle x:Name="StopIcon"
-                                       Width="13"
-                                       Height="13"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       RadiusX="1"
-                                       RadiusY="1"
-                                       Fill="#B94242"
-                                       Visibility="Collapsed" />
-                        </Grid>
-                    </Button>
+                    <StackPanel Margin="0,0,10,0">
+                        <ToggleButton x:Name="RecordToggleButton"
+                                      Margin="0"
+                                      Style="{StaticResource IconToggleStyle}"
+                                      Checked="RecordToggleButton_OnChecked"
+                                      Unchecked="RecordToggleButton_OnUnchecked"
+                                      ToolTip="Start or stop recording">
+                            <Grid Width="24"
+                                  Height="24"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center">
+                                <Ellipse x:Name="RecordIcon"
+                                         Width="18"
+                                         Height="18"
+                                         HorizontalAlignment="Center"
+                                         VerticalAlignment="Center"
+                                         Fill="#F25050"
+                                         Stroke="#B53C3C"
+                                         StrokeThickness="1.2" />
+                                <Rectangle x:Name="RecordStopIcon"
+                                           Width="13"
+                                           Height="13"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           RadiusX="1"
+                                           RadiusY="1"
+                                           Fill="#B94242"
+                                           Visibility="Collapsed" />
+                            </Grid>
+                        </ToggleButton>
 
-                    <ToggleButton x:Name="RecordToggleButton"
-                                  Style="{StaticResource IconToggleStyle}"
-                                  Checked="RecordToggleButton_OnChecked"
-                                  Unchecked="RecordToggleButton_OnUnchecked"
-                                  ToolTip="Start or stop recording">
-                        <Ellipse Width="18"
-                                 Height="18"
-                                 HorizontalAlignment="Center"
-                                 VerticalAlignment="Center"
-                                 Fill="#F25050"
-                                 Stroke="#B53C3C"
-                                 StrokeThickness="1.2" />
-                    </ToggleButton>
+                        <TextBlock x:Name="RecordShortcutTextBlock"
+                                   Width="48"
+                                   Margin="0,1,0,0"
+                                   FontSize="8"
+                                   Foreground="#6B6559"
+                                   TextAlignment="Center"
+                                   Text="F5" />
+                    </StackPanel>
+
+                    <StackPanel Margin="0,0,10,0">
+                        <Button x:Name="PlayButton"
+                                Margin="0"
+                                Style="{StaticResource IconButtonStyle}"
+                                Click="PlayButton_OnClick"
+                                ToolTip="Play or stop the current macro">
+                            <Grid Width="24"
+                                  Height="24"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center">
+                                <Polygon x:Name="PlayIcon"
+                                         Points="4,2 20,12 4,22"
+                                         Fill="#91C433"
+                                         Stroke="#6A8D23"
+                                         StrokeThickness="1.2" />
+                                <Rectangle x:Name="StopIcon"
+                                           Width="13"
+                                           Height="13"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           RadiusX="1"
+                                           RadiusY="1"
+                                           Fill="#B94242"
+                                           Visibility="Collapsed" />
+                            </Grid>
+                        </Button>
+
+                        <TextBlock x:Name="PlayShortcutTextBlock"
+                                   Width="48"
+                                   Margin="0,1,0,0"
+                                   FontSize="8"
+                                   Foreground="#6B6559"
+                                   TextAlignment="Center"
+                                   Text="F6" />
+                    </StackPanel>
 
                     <ToggleButton x:Name="LoopToggleButton"
+                                  Margin="0,0,0,10"
                                   Style="{StaticResource IconToggleStyle}"
-                                  Margin="0"
                                   Checked="LoopToggleButton_OnChanged"
                                   Unchecked="LoopToggleButton_OnChanged"
                                   ToolTip="Loop playback until stopped">
@@ -288,6 +295,22 @@
                              Style="{StaticResource CompactTextBoxStyle}"
                              Text="1.00" />
                 </Grid>
+
+                <Button x:Name="SettingsButton"
+                        Grid.Column="4"
+                        Width="26"
+                        Height="26"
+                        Margin="0,0,0,10"
+                        Style="{StaticResource IconButtonStyle}"
+                        Click="SettingsButton_OnClick"
+                        ToolTip="Settings">
+                    <TextBlock FontFamily="Segoe MDL2 Assets"
+                               FontSize="14"
+                               Foreground="#5C564A"
+                               Text="&#xE713;"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center" />
+                </Button>
             </Grid>
 
             <Border x:Name="SettingsPane"
@@ -350,44 +373,28 @@
                                  ToolTip="Click here and press the play shortcut" />
                     </Grid>
 
-                    <StackPanel Orientation="Horizontal"
-                                HorizontalAlignment="Right"
-                                Margin="0,8,0,0">
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="6" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <CheckBox x:Name="RecordKeyboardCheckBox"
+                                  VerticalAlignment="Center"
+                                  FontSize="10"
+                                  Foreground="#4D473B"
+                                  Content="Keyboard"
+                                  ToolTip="Toggle keyboard recording" />
+
                         <Button x:Name="ImportButton"
+                                Grid.Column="1"
                                 Width="24"
                                 Height="24"
-                                Margin="0,0,6,0"
                                 Style="{StaticResource IconButtonStyle}"
                                 Click="ImportButton_OnClick"
                                 ToolTip="Import a recorded macro">
-                            <Grid Width="14"
-                                  Height="14"
-                                  HorizontalAlignment="Center"
-                                  VerticalAlignment="Center">
-                                <Path Stroke="#5B5549"
-                                      StrokeThickness="1.4"
-                                      StrokeStartLineCap="Round"
-                                      StrokeEndLineCap="Round"
-                                      Data="M2,11.5 H12" />
-                                <Path Stroke="#5B5549"
-                                      StrokeThickness="1.4"
-                                      StrokeStartLineCap="Round"
-                                      StrokeEndLineCap="Round"
-                                      Data="M7,1.5 V9" />
-                                <Path Stroke="#5B5549"
-                                      StrokeThickness="1.4"
-                                      StrokeStartLineCap="Round"
-                                      StrokeEndLineCap="Round"
-                                      Data="M4.5,6.5 L7,9 L9.5,6.5" />
-                            </Grid>
-                        </Button>
-
-                        <Button x:Name="ExportButton"
-                                Width="24"
-                                Height="24"
-                                Style="{StaticResource IconButtonStyle}"
-                                Click="ExportButton_OnClick"
-                                ToolTip="Export the current macro">
                             <Grid Width="14"
                                   Height="14"
                                   HorizontalAlignment="Center"
@@ -409,7 +416,36 @@
                                       Data="M4.5,6.5 L7,4 L9.5,6.5" />
                             </Grid>
                         </Button>
-                    </StackPanel>
+
+                        <Button x:Name="ExportButton"
+                                Grid.Column="3"
+                                Width="24"
+                                Height="24"
+                                Style="{StaticResource IconButtonStyle}"
+                                Click="ExportButton_OnClick"
+                                ToolTip="Export the current macro">
+                            <Grid Width="14"
+                                  Height="14"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center">
+                                <Path Stroke="#5B5549"
+                                      StrokeThickness="1.4"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      Data="M2,11.5 H12" />
+                                <Path Stroke="#5B5549"
+                                      StrokeThickness="1.4"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      Data="M7,1.5 V9" />
+                                <Path Stroke="#5B5549"
+                                      StrokeThickness="1.4"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      Data="M4.5,6.5 L7,9 L9.5,6.5" />
+                            </Grid>
+                        </Button>
+                    </Grid>
                 </StackPanel>
             </Border>
         </Grid>

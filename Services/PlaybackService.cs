@@ -57,7 +57,31 @@ internal sealed class PlaybackService
 
     private static void Execute(MacroEvent macroEvent)
     {
-        NativeMethods.SetCursorPos(macroEvent.X, macroEvent.Y);
+        if (IsMouseEvent(macroEvent.Type))
+        {
+            NativeMethods.SetCursorPos(macroEvent.X, macroEvent.Y);
+        }
+
+        if (macroEvent.Type is MacroEventType.KeyDown or MacroEventType.KeyUp)
+        {
+            NativeMethods.Input keyboardInput = new()
+            {
+                Type = NativeMethods.InputKeyboard,
+                Union = new NativeMethods.InputUnion
+                {
+                    KeyboardInput = new NativeMethods.KeyboardInput
+                    {
+                        WVk = (ushort)macroEvent.VirtualKey,
+                        DwFlags = macroEvent.Type == MacroEventType.KeyUp
+                            ? NativeMethods.KeyEventFKeyUp
+                            : 0,
+                    },
+                },
+            };
+
+            NativeMethods.SendInput(1, [keyboardInput], Marshal.SizeOf<NativeMethods.Input>());
+            return;
+        }
 
         uint? flag = macroEvent.Type switch
         {
@@ -93,5 +117,17 @@ internal sealed class PlaybackService
         };
 
         NativeMethods.SendInput(1, [input], Marshal.SizeOf<NativeMethods.Input>());
+    }
+
+    private static bool IsMouseEvent(MacroEventType eventType)
+    {
+        return eventType is MacroEventType.Move
+            or MacroEventType.LeftDown
+            or MacroEventType.LeftUp
+            or MacroEventType.RightDown
+            or MacroEventType.RightUp
+            or MacroEventType.MiddleDown
+            or MacroEventType.MiddleUp
+            or MacroEventType.Wheel;
     }
 }

@@ -21,15 +21,16 @@ public partial class MainWindow : Window
     private const int HotkeyPlay = 1002;
     private const double CompactWindowWidth = 356;
     private const double CompactWindowMinWidth = 348;
-    private const double CompactWindowHeight = 144;
-    private const double CompactWindowMinHeight = 140;
+    private const double CompactWindowHeight = 136;
+    private const double CompactWindowMinHeight = 132;
     private const double ExpandedWindowWidth = 548;
     private const double ExpandedWindowMinWidth = 540;
-    private const double ExpandedWindowHeight = 174;
-    private const double ExpandedWindowMinHeight = 170;
+    private const double ExpandedWindowHeight = 166;
+    private const double ExpandedWindowMinHeight = 162;
     private const double SettingsPaneOpenWidth = 188;
     private const int PaneAnimationMilliseconds = 140;
 
+    private readonly KeyboardHookService _keyboardHookService = new();
     private readonly MouseHookService _mouseHookService = new();
     private readonly MacroFileService _macroFileService = new();
     private readonly PlaybackService _playbackService = new();
@@ -46,6 +47,7 @@ public partial class MainWindow : Window
     private bool _isRecording;
     private bool _isUpdatingUi;
     private bool _isSettingsOpen;
+    private bool _hotkeysTemporarilyDisabled;
     private HotkeyBinding _recordHotkey;
     private HotkeyBinding _playHotkey;
     private HotkeyBinding _draftRecordHotkey;
@@ -60,6 +62,7 @@ public partial class MainWindow : Window
         _draftRecordHotkey = _recordHotkey;
         _draftPlayHotkey = _playHotkey;
 
+        _keyboardHookService.KeyboardActionCaptured += KeyboardHookService_OnKeyboardActionCaptured;
         _mouseHookService.ShouldIgnorePoint = IsPointInsideWindow;
         _mouseHookService.MouseActionCaptured += MouseHookService_OnMouseActionCaptured;
         SourceInitialized += MainWindow_OnSourceInitialized;
@@ -102,6 +105,7 @@ public partial class MainWindow : Window
         }
 
         UnregisterHotkeys();
+        _keyboardHookService.Dispose();
         _mouseHookService.Dispose();
 
         base.OnClosing(e);
@@ -279,6 +283,29 @@ public partial class MainWindow : Window
         });
     }
 
+    private void KeyboardHookService_OnKeyboardActionCaptured(object? sender, MacroEvent capturedEvent)
+    {
+        if (!_isRecording)
+        {
+            return;
+        }
+
+        _ = Dispatcher.InvokeAsync(() =>
+        {
+            if (!_isRecording)
+            {
+                return;
+            }
+
+            TimeSpan currentOffset = _recordingStopwatch.Elapsed;
+            TimeSpan delay = currentOffset - _lastRecordedOffset;
+            _lastRecordedOffset = currentOffset;
+
+            _recordedEvents.Add(capturedEvent with { DelayBeforeEvent = delay });
+            UpdateEventCount();
+        });
+    }
+
     private void StartRecording()
     {
         if (_isRecording || _isPlaying)
@@ -286,16 +313,47 @@ public partial class MainWindow : Window
             return;
         }
 
+        bool recordKeyboardActions = RecordKeyboardCheckBox.IsChecked == true;
+
         _recordedEvents.Clear();
         _lastRecordedOffset = TimeSpan.Zero;
         _recordingStopwatch.Restart();
         UpdateEventCount();
 
-        _mouseHookService.Start();
+        if (recordKeyboardActions)
+        {
+            PauseHotkeysTemporarily();
+        }
+
+        try
+        {
+            _mouseHookService.Start();
+
+            if (recordKeyboardActions)
+            {
+                _keyboardHookService.Start();
+            }
+        }
+        catch
+        {
+            if (_keyboardHookService.IsRunning)
+            {
+                _keyboardHookService.Stop();
+            }
+
+            if (_mouseHookService.IsRunning)
+            {
+                _mouseHookService.Stop();
+            }
+
+            ResumeHotkeysIfNeeded();
+            throw;
+        }
+
         _isRecording = true;
 
         UpdateUiState();
-        SetStatus("Recording...");
+        SetStatus(recordKeyboardActions ? "Recording mouse + keyboard..." : "Recording...");
     }
 
     private void StopRecording()
@@ -305,9 +363,24 @@ public partial class MainWindow : Window
             return;
         }
 
-        _mouseHookService.Stop();
-        _recordingStopwatch.Stop();
-        _isRecording = false;
+        try
+        {
+            if (_keyboardHookService.IsRunning)
+            {
+                _keyboardHookService.Stop();
+            }
+
+            if (_mouseHookService.IsRunning)
+            {
+                _mouseHookService.Stop();
+            }
+        }
+        finally
+        {
+            ResumeHotkeysIfNeeded();
+            _recordingStopwatch.Stop();
+            _isRecording = false;
+        }
 
         UpdateUiState();
         SetStatus(_recordedEvents.Count == 0 ? "Ready..." : "Recording saved.");
@@ -348,11 +421,19 @@ public partial class MainWindow : Window
         }
 
         _playbackCancellationTokenSource = new CancellationTokenSource();
+        bool containsKeyboardEvents = ContainsKeyboardEvents();
+        if (containsKeyboardEvents)
+        {
+            PauseHotkeysTemporarily();
+        }
+
         _isPlaying = true;
         UpdateUiState();
+
+        string hotkeyPauseText = containsKeyboardEvents ? " Hotkeys paused." : string.Empty;
         SetStatus(loopForever
-            ? $"Playing in loop at {speedMultiplier:0.##}x..."
-            : $"Playing {repeatCount} time(s) at {speedMultiplier:0.##}x...");
+            ? $"Playing in loop at {speedMultiplier:0.##}x...{hotkeyPauseText}"
+            : $"Playing {repeatCount} time(s) at {speedMultiplier:0.##}x...{hotkeyPauseText}");
 
         bool cancelled = false;
 
@@ -374,6 +455,7 @@ public partial class MainWindow : Window
             _playbackCancellationTokenSource?.Dispose();
             _playbackCancellationTokenSource = null;
             _isPlaying = false;
+            ResumeHotkeysIfNeeded();
             UpdateUiState();
             SetStatus(cancelled ? "Playback stopped." : "Ready...");
         }
@@ -395,6 +477,8 @@ public partial class MainWindow : Window
 
         RecordToggleButton.IsEnabled = !_isPlaying;
         RecordToggleButton.IsChecked = _isRecording;
+        RecordIcon.Visibility = _isRecording ? Visibility.Collapsed : Visibility.Visible;
+        RecordStopIcon.Visibility = _isRecording ? Visibility.Visible : Visibility.Collapsed;
 
         PlayButton.IsEnabled = !_isRecording && (_isPlaying || _recordedEvents.Count > 0);
         PlayIcon.Visibility = _isPlaying ? Visibility.Collapsed : Visibility.Visible;
@@ -404,6 +488,7 @@ public partial class MainWindow : Window
 
         RepeatCountTextBox.IsEnabled = !_isRecording && !_isPlaying && LoopToggleButton.IsChecked != true;
         SpeedTextBox.IsEnabled = !_isRecording && !_isPlaying;
+        RecordKeyboardCheckBox.IsEnabled = !_isRecording && !_isPlaying;
         ImportButton.IsEnabled = !_isRecording && !_isPlaying;
         ExportButton.IsEnabled = !_isRecording && !_isPlaying && _recordedEvents.Count > 0;
 
@@ -602,6 +687,32 @@ public partial class MainWindow : Window
         PlayHotkeyTextBox.Text = _draftPlayHotkey.DisplayText;
     }
 
+    private void PauseHotkeysTemporarily()
+    {
+        if (_hotkeysTemporarilyDisabled)
+        {
+            return;
+        }
+
+        UnregisterHotkeys();
+        _unavailableHotkeys.Clear();
+        UpdateShortcutLegend();
+        _hotkeysTemporarilyDisabled = true;
+    }
+
+    private void ResumeHotkeysIfNeeded()
+    {
+        if (!_hotkeysTemporarilyDisabled)
+        {
+            return;
+        }
+
+        _unavailableHotkeys.Clear();
+        RegisterHotkeys();
+        UpdateShortcutLegend();
+        _hotkeysTemporarilyDisabled = false;
+    }
+
     private void CaptureShortcut(KeyEventArgs e, bool isRecordField)
     {
         e.Handled = true;
@@ -662,15 +773,16 @@ public partial class MainWindow : Window
         return true;
     }
 
+    private bool ContainsKeyboardEvents()
+    {
+        return _recordedEvents.Any(static recordedEvent =>
+            recordedEvent.Type is MacroEventType.KeyDown or MacroEventType.KeyUp);
+    }
+
     private void UpdateShortcutLegend()
     {
-        string legend = $"{_recordHotkey.DisplayText} Record    {_playHotkey.DisplayText} Play/Stop";
-        if (_unavailableHotkeys.Count > 0)
-        {
-            legend += $"    Unavailable: {string.Join(", ", _unavailableHotkeys)}";
-        }
-
-        ShortcutLegendTextBlock.Text = legend;
+        RecordShortcutTextBlock.Text = _recordHotkey.DisplayText;
+        PlayShortcutTextBlock.Text = _playHotkey.DisplayText;
     }
 
     private bool IsPointInsideWindow(int x, int y)

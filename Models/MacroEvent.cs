@@ -10,6 +10,8 @@ internal enum MacroEventType
     MiddleDown,
     MiddleUp,
     Wheel,
+    KeyDown,
+    KeyUp,
 }
 
 internal sealed record MacroEvent(
@@ -17,4 +19,5 @@ internal sealed record MacroEvent(
     int X,
     int Y,
     int Delta,
-    TimeSpan DelayBeforeEvent);
+    TimeSpan DelayBeforeEvent,
+    uint VirtualKey = 0);

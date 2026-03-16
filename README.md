@@ -9,6 +9,7 @@ Simple Windows mouse recorder / repeater built with `C#`, `.NET 9`, and `WPF`.
 - Replay the captured mouse actions a fixed number of times.
 - Loop playback forever until `F6` is pressed again.
 - Change playback speed with a `Speed x` control.
+- Optionally record keyboard key presses with a `Keyboard` checkbox in settings.
 - Import a saved macro from the settings pane.
 - Export the current macro from the settings pane.
 
@@ -16,8 +17,9 @@ Simple Windows mouse recorder / repeater built with `C#`, `.NET 9`, and `WPF`.
 
 - Recording starts fresh each time and replaces the previous macro.
 - Clicks inside the app window are ignored while recording so the control buttons are not captured.
-- The current implementation records mouse movement, left/right/middle button actions, and mouse wheel input.
+- The current implementation records mouse movement, left/right/middle button actions, mouse wheel input, and optional keyboard key up/down events.
 - Imported macros replace the current recorded events after confirmation.
+- Hotkeys are paused while recording or replaying keyboard actions so they are not accidentally captured or triggered by the macro itself.
 
 ## Run
 
