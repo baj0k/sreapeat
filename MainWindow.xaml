@@ -349,6 +349,67 @@
                                  PreviewMouseLeftButtonDown="ShortcutTextBox_OnPreviewMouseLeftButtonDown"
                                  ToolTip="Click here and press the play shortcut" />
                     </Grid>
+
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Right"
+                                Margin="0,8,0,0">
+                        <Button x:Name="ImportButton"
+                                Width="24"
+                                Height="24"
+                                Margin="0,0,6,0"
+                                Style="{StaticResource IconButtonStyle}"
+                                Click="ImportButton_OnClick"
+                                ToolTip="Import a recorded macro">
+                            <Grid Width="14"
+                                  Height="14"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center">
+                                <Path Stroke="#5B5549"
+                                      StrokeThickness="1.4"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      Data="M2,11.5 H12" />
+                                <Path Stroke="#5B5549"
+                                      StrokeThickness="1.4"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      Data="M7,1.5 V9" />
+                                <Path Stroke="#5B5549"
+                                      StrokeThickness="1.4"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      Data="M4.5,6.5 L7,9 L9.5,6.5" />
+                            </Grid>
+                        </Button>
+
+                        <Button x:Name="ExportButton"
+                                Width="24"
+                                Height="24"
+                                Style="{StaticResource IconButtonStyle}"
+                                Click="ExportButton_OnClick"
+                                ToolTip="Export the current macro">
+                            <Grid Width="14"
+                                  Height="14"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center">
+                                <Path Stroke="#5B5549"
+                                      StrokeThickness="1.4"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      Data="M2,11.5 H12" />
+                                <Path Stroke="#5B5549"
+                                      StrokeThickness="1.4"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      Data="M7,11.5 V4" />
+                                <Path Stroke="#5B5549"
+                                      StrokeThickness="1.4"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      Data="M4.5,6.5 L7,4 L9.5,6.5" />
+                            </Grid>
+                        </Button>
+                    </StackPanel>
                 </StackPanel>
             </Border>
         </Grid>

@@ -13,4 +13,10 @@
   <ItemGroup>
     <Resource Include="Assets\AppIcon.ico" />
   </ItemGroup>
+
+  <Target Name="RequireReleaseConfiguration"
+          BeforeTargets="Build"
+          Condition="'$(Configuration)' != 'Release'">
+    <Error Text="Build this project with -c Release. Debug outputs are intentionally disabled to keep bin clean." />
+  </Target>
 </Project>

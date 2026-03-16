@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using Microsoft.Win32;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -20,12 +21,17 @@ public partial class MainWindow : Window
     private const int HotkeyPlay = 1002;
     private const double CompactWindowWidth = 356;
     private const double CompactWindowMinWidth = 348;
+    private const double CompactWindowHeight = 144;
+    private const double CompactWindowMinHeight = 140;
     private const double ExpandedWindowWidth = 548;
     private const double ExpandedWindowMinWidth = 540;
+    private const double ExpandedWindowHeight = 174;
+    private const double ExpandedWindowMinHeight = 170;
     private const double SettingsPaneOpenWidth = 188;
     private const int PaneAnimationMilliseconds = 140;
 
     private readonly MouseHookService _mouseHookService = new();
+    private readonly MacroFileService _macroFileService = new();
     private readonly PlaybackService _playbackService = new();
     private readonly Stopwatch _recordingStopwatch = new();
     private readonly List<MacroEvent> _recordedEvents = [];
@@ -135,6 +141,80 @@ public partial class MainWindow : Window
     private void SettingsButton_OnClick(object sender, RoutedEventArgs e)
     {
         SetSettingsPaneOpen(!_isSettingsOpen);
+    }
+
+    private void ImportButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (_isRecording || _isPlaying)
+        {
+            return;
+        }
+
+        if (_recordedEvents.Count > 0)
+        {
+            MessageBoxResult replaceExisting = MessageBox.Show(
+                "Importing a macro replaces the current recorded events. Continue?",
+                "sreapeat",
+                MessageBoxButton.OKCancel,
+                MessageBoxImage.Question);
+
+            if (replaceExisting != MessageBoxResult.OK)
+            {
+                return;
+            }
+        }
+
+        OpenFileDialog openFileDialog = new()
+        {
+            Title = "Import macro",
+            Filter = "sreapeat macro (*.sreapeat.json)|*.sreapeat.json|JSON files (*.json)|*.json|All files (*.*)|*.*",
+            DefaultExt = ".json",
+            CheckFileExists = true,
+        };
+
+        if (openFileDialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        RunSafeUiAction(() =>
+        {
+            IReadOnlyList<MacroEvent> importedEvents = _macroFileService.Import(openFileDialog.FileName);
+            _recordedEvents.Clear();
+            _recordedEvents.AddRange(importedEvents);
+            UpdateEventCount();
+            UpdateUiState();
+            SetStatus($"Imported {_recordedEvents.Count} event{(_recordedEvents.Count == 1 ? string.Empty : "s")}.");
+        });
+    }
+
+    private void ExportButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (_isRecording || _isPlaying || _recordedEvents.Count == 0)
+        {
+            return;
+        }
+
+        SaveFileDialog saveFileDialog = new()
+        {
+            Title = "Export macro",
+            Filter = "sreapeat macro (*.sreapeat.json)|*.sreapeat.json|JSON files (*.json)|*.json|All files (*.*)|*.*",
+            DefaultExt = ".json",
+            AddExtension = true,
+            FileName = "macro.sreapeat.json",
+            OverwritePrompt = true,
+        };
+
+        if (saveFileDialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        RunSafeUiAction(() =>
+        {
+            _macroFileService.Export(saveFileDialog.FileName, _recordedEvents);
+            SetStatus($"Exported {_recordedEvents.Count} event{(_recordedEvents.Count == 1 ? string.Empty : "s")}.");
+        });
     }
 
     private void ShortcutTextBox_OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -324,6 +404,8 @@ public partial class MainWindow : Window
 
         RepeatCountTextBox.IsEnabled = !_isRecording && !_isPlaying && LoopToggleButton.IsChecked != true;
         SpeedTextBox.IsEnabled = !_isRecording && !_isPlaying;
+        ImportButton.IsEnabled = !_isRecording && !_isPlaying;
+        ExportButton.IsEnabled = !_isRecording && !_isPlaying && _recordedEvents.Count > 0;
 
         RecordToggleButton.ToolTip = _isRecording ? $"Stop recording ({_recordHotkey.DisplayText})" : $"Start recording ({_recordHotkey.DisplayText})";
         PlayButton.ToolTip = _isPlaying ? $"Stop playback ({_playHotkey.DisplayText})" : $"Play current macro ({_playHotkey.DisplayText})";
@@ -445,12 +527,13 @@ public partial class MainWindow : Window
             SettingsPane.IsHitTestVisible = true;
             SettingsPaneColumn.Width = GridLength.Auto;
             MinWidth = ExpandedWindowMinWidth;
+            MinHeight = ExpandedWindowMinHeight;
 
             AnimatePane(
                 targetWidth: SettingsPaneOpenWidth,
                 targetOpacity: 1.0,
                 onCompleted: null);
-            AnimateWindowWidth(ExpandedWindowWidth);
+            AnimateWindowSize(ExpandedWindowWidth, ExpandedWindowHeight);
 
             _ = Dispatcher.InvokeAsync(() =>
             {
@@ -467,6 +550,7 @@ public partial class MainWindow : Window
 
             SettingsPane.IsHitTestVisible = false;
             MinWidth = CompactWindowMinWidth;
+            MinHeight = CompactWindowMinHeight;
 
             AnimatePane(
                 targetWidth: 0,
@@ -481,7 +565,7 @@ public partial class MainWindow : Window
                     SettingsPane.Visibility = Visibility.Collapsed;
                     SettingsPaneColumn.Width = new GridLength(0);
                 });
-            AnimateWindowWidth(CompactWindowWidth);
+            AnimateWindowSize(CompactWindowWidth, CompactWindowHeight);
         }
 
         UpdateUiState();
@@ -504,10 +588,12 @@ public partial class MainWindow : Window
         SettingsPane.BeginAnimation(OpacityProperty, opacityAnimation);
     }
 
-    private void AnimateWindowWidth(double targetWidth)
+    private void AnimateWindowSize(double targetWidth, double targetHeight)
     {
         BeginAnimation(WidthProperty, null);
+        BeginAnimation(HeightProperty, null);
         BeginAnimation(WidthProperty, CreateAnimation(targetWidth));
+        BeginAnimation(HeightProperty, CreateAnimation(targetHeight));
     }
 
     private void RefreshShortcutEditorText()
