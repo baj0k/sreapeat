@@ -54,7 +54,7 @@ jobs:
 
       - name: Publish win-x64 package
         run: >
-          dotnet publish .\sreapeat.csproj -c Release -r win-x64 --self-contained false --no-build
+          dotnet publish .\sreapeat.csproj -c Release -r win-x64 --self-contained false
           --output .\artifacts\publish\win-x64
           -p:Version=${{ steps.version.outputs.version }}
           -p:AssemblyVersion=${{ steps.version.outputs.assembly_version }}
