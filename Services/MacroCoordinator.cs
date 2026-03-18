@@ -221,14 +221,17 @@ internal sealed class MacroCoordinator
         return KeyboardCaptureOutcome.EventRecorded;
     }
 
-    public PlaybackLaunchResult TryStartPlayback(int repeatCount, bool loopForever, double speedMultiplier)
+    public PlaybackLaunchResult TryStartPlayback(int repeatCount, bool loopForever, double speedMultiplier, bool useStraightPaths)
     {
         if (!_runtimeSession.TryBeginPlayback())
         {
             return new PlaybackLaunchResult(false);
         }
 
-        bool useHookBasedPlaybackStop = MacroEventInspector.ContainsKeyboardEvents(_macroEventBuffer.Events);
+        IReadOnlyList<MacroEvent> playbackEvents = useStraightPaths
+            ? StraightPathService.TransformForPlayback(_macroEventBuffer.Events)
+            : _macroEventBuffer.Events;
+        bool useHookBasedPlaybackStop = MacroEventInspector.ContainsKeyboardEvents(playbackEvents);
         if (useHookBasedPlaybackStop)
         {
             try
@@ -254,7 +257,7 @@ internal sealed class MacroCoordinator
 
         return new PlaybackLaunchResult(
             true,
-            RunPlaybackAsync(repeatCount, loopForever, speedMultiplier));
+            RunPlaybackAsync(playbackEvents, repeatCount, loopForever, speedMultiplier));
     }
 
     public void StopPlayback()
@@ -267,12 +270,16 @@ internal sealed class MacroCoordinator
         _runtimeSession.CancelPlayback();
     }
 
-    private async Task<PlaybackRunResult> RunPlaybackAsync(int repeatCount, bool loopForever, double speedMultiplier)
+    private async Task<PlaybackRunResult> RunPlaybackAsync(
+        IReadOnlyList<MacroEvent> playbackEvents,
+        int repeatCount,
+        bool loopForever,
+        double speedMultiplier)
     {
         try
         {
             await _playbackService.PlayAsync(
-                _macroEventBuffer.Events,
+                playbackEvents,
                 repeatCount,
                 loopForever,
                 speedMultiplier,

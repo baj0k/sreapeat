@@ -377,12 +377,19 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <CheckBox x:Name="RecordKeyboardCheckBox"
-                                  VerticalAlignment="Center"
-                                  FontSize="10"
-                                  Foreground="#4D473B"
-                                  Content="Keyboard"
-                                  ToolTip="Toggle keyboard recording" />
+                        <StackPanel VerticalAlignment="Center">
+                            <CheckBox x:Name="RecordKeyboardCheckBox"
+                                      FontSize="10"
+                                      Foreground="#4D473B"
+                                      Content="Keyboard"
+                                      ToolTip="Toggle keyboard recording" />
+                            <CheckBox x:Name="StraightPathsCheckBox"
+                                      Margin="0,3,0,0"
+                                      FontSize="10"
+                                      Foreground="#4D473B"
+                                      Content="Straight"
+                                      ToolTip="Use straight mouse paths during playback" />
+                        </StackPanel>
 
                         <Button x:Name="ImportButton"
                                 Grid.Column="1"

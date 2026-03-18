@@ -125,7 +125,7 @@ public sealed class MacroCoordinatorTests
             () => suspendCount++,
             () => resumeCount++);
 
-        PlaybackLaunchResult launchResult = coordinator.TryStartPlayback(repeatCount: 1, loopForever: false, speedMultiplier: 1.0);
+        PlaybackLaunchResult launchResult = coordinator.TryStartPlayback(repeatCount: 1, loopForever: false, speedMultiplier: 1.0, useStraightPaths: false);
 
         Assert.True(launchResult.Started);
         Assert.NotNull(launchResult.PlaybackTask);
@@ -161,7 +161,7 @@ public sealed class MacroCoordinatorTests
             () => suspendCount++,
             () => resumeCount++);
 
-        PlaybackLaunchResult launchResult = coordinator.TryStartPlayback(repeatCount: 1, loopForever: false, speedMultiplier: 1.0);
+        PlaybackLaunchResult launchResult = coordinator.TryStartPlayback(repeatCount: 1, loopForever: false, speedMultiplier: 1.0, useStraightPaths: false);
 
         Assert.False(launchResult.Started);
         Assert.NotNull(launchResult.Failure);
@@ -169,6 +169,42 @@ public sealed class MacroCoordinatorTests
         Assert.False(session.IsPlaying);
         Assert.Equal(1, suspendCount);
         Assert.Equal(1, resumeCount);
+    }
+
+    [Fact]
+    public async Task TryStartPlayback_WithStraightPathsEnabled_TransformsMouseMoveRunsBeforePlayback()
+    {
+        MacroEventBuffer buffer = new();
+        buffer.ReplaceAll(
+        [
+            new(MacroEventType.LeftUp, 0, 0, 0, TimeSpan.Zero),
+            new(MacroEventType.Move, 20, 80, 0, TimeSpan.FromMilliseconds(10)),
+            new(MacroEventType.Move, 80, 20, 0, TimeSpan.FromMilliseconds(15)),
+            new(MacroEventType.LeftDown, 100, 100, 0, TimeSpan.FromMilliseconds(5)),
+        ]);
+
+        FakePlaybackService playbackService = new();
+        MacroCoordinator coordinator = new(
+            buffer,
+            new MacroRuntimeSession(),
+            new FakeHookService(),
+            new FakeHookService(),
+            playbackService,
+            static () => { },
+            static () => { });
+
+        PlaybackLaunchResult launchResult = coordinator.TryStartPlayback(repeatCount: 1, loopForever: false, speedMultiplier: 1.0, useStraightPaths: true);
+
+        Assert.True(launchResult.Started);
+        PlaybackRunResult result = await launchResult.PlaybackTask!;
+
+        Assert.Equal(PlaybackRunStatus.Completed, result.Status);
+        Assert.NotNull(playbackService.CapturedEvents);
+        Assert.Equal(4, playbackService.CapturedEvents!.Count);
+        Assert.Equal(40, playbackService.CapturedEvents[1].X);
+        Assert.Equal(40, playbackService.CapturedEvents[1].Y);
+        Assert.Equal(100, playbackService.CapturedEvents[2].X);
+        Assert.Equal(100, playbackService.CapturedEvents[2].Y);
     }
 
     private sealed class FakeHookService : IHookService
@@ -203,6 +239,8 @@ public sealed class MacroCoordinatorTests
     {
         public int Calls { get; private set; }
 
+        public IReadOnlyList<MacroEvent>? CapturedEvents { get; private set; }
+
         public Func<CancellationToken, Task>? PlayAsyncHandler { get; init; }
 
         public Task PlayAsync(
@@ -213,6 +251,7 @@ public sealed class MacroCoordinatorTests
             CancellationToken cancellationToken)
         {
             Calls++;
+            CapturedEvents = events.ToList();
             return PlayAsyncHandler?.Invoke(cancellationToken) ?? Task.CompletedTask;
         }
     }

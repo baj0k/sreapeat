@@ -339,7 +339,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        PlaybackLaunchResult launchResult = _macroCoordinator.TryStartPlayback(repeatCount, loopForever, speedMultiplier);
+        bool useStraightPaths = StraightPathsCheckBox.IsChecked == true;
+        PlaybackLaunchResult launchResult = _macroCoordinator.TryStartPlayback(repeatCount, loopForever, speedMultiplier, useStraightPaths);
         if (launchResult.Failure is not null)
         {
             AppLogger.Error("Unable to prepare playback keyboard hook.", launchResult.Failure);
@@ -358,9 +359,10 @@ public partial class MainWindow : Window
 
         UpdateUiState();
 
+        string straightPathSuffix = useStraightPaths ? " with straight paths" : string.Empty;
         SetStatus(loopForever
-            ? $"Playing in loop at {speedMultiplier:0.##}x..."
-            : $"Playing {repeatCount} time(s) at {speedMultiplier:0.##}x...");
+            ? $"Playing in loop at {speedMultiplier:0.##}x{straightPathSuffix}..."
+            : $"Playing {repeatCount} time(s) at {speedMultiplier:0.##}x{straightPathSuffix}...");
 
         PlaybackRunResult playbackResult = await launchResult.PlaybackTask;
         UpdateUiState();
@@ -408,6 +410,7 @@ public partial class MainWindow : Window
         RepeatCountTextBox.IsEnabled = !_runtimeSession.IsRecording && !_runtimeSession.IsPlaying && LoopToggleButton.IsChecked != true;
         SpeedTextBox.IsEnabled = !_runtimeSession.IsRecording && !_runtimeSession.IsPlaying;
         RecordKeyboardCheckBox.IsEnabled = !IsBusy;
+        StraightPathsCheckBox.IsEnabled = !IsBusy;
         ImportButton.IsEnabled = !IsBusy;
         ExportButton.IsEnabled = !IsBusy && _macroEventBuffer.HasEvents;
 

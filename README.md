@@ -2,7 +2,7 @@
 
 sreapeat is a lightweight Windows macro recorder and repeater built with `C#`, `.NET 10`, and `WPF`.
 
-It is designed for a simple record / replay flow: capture a mouse-driven task, optionally include keyboard input, then replay it with repeat count, loop, and speed controls. Saved macros can also be imported and exported as JSON.
+It is designed for a simple record / replay flow: capture a mouse-driven task, optionally include keyboard input, then replay it with repeat count, loop, speed controls, and optional straight-path mouse playback. Saved macros can also be imported and exported as JSON.
 
 ## Install
 
