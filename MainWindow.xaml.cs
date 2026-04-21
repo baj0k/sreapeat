@@ -41,12 +41,16 @@ public partial class MainWindow : Window
 
     private readonly HotkeyBinding _defaultRecordHotkey = HotkeyService.CreateBinding(Key.F5, ModifierKeys.None);
     private readonly HotkeyBinding _defaultPlayHotkey = HotkeyService.CreateBinding(Key.F6, ModifierKeys.None);
+    private readonly HotkeyBinding _defaultLockHotkey = HotkeyService.CreateBinding(Key.F9, ModifierKeys.None);
     private readonly Brush _defaultShortcutBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#6B6559"));
     private readonly Brush _unavailableShortcutBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#A14D4D"));
+    private readonly Brush _lockActiveIconBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#C06828"));
+    private readonly Brush _lockInactiveIconBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#A09488"));
     private HwndSource? _windowSource;
     private bool _isUpdatingUi;
     private bool _isSettingsOpen;
     private bool _isClosing;
+    private bool _isRecordLocked;
     private HotkeyBinding _draftRecordHotkey;
     private HotkeyBinding _draftPlayHotkey;
 
@@ -55,7 +59,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         ApplyWindowMetrics(isExpanded: false, animate: false);
 
-        _hotkeyManager = new HotkeyManager(_defaultRecordHotkey, _defaultPlayHotkey);
+        _hotkeyManager = new HotkeyManager(_defaultRecordHotkey, _defaultPlayHotkey, _defaultLockHotkey);
         _macroCoordinator = new MacroCoordinator(
             _macroEventBuffer,
             _runtimeSession,
@@ -68,6 +72,8 @@ public partial class MainWindow : Window
         _draftPlayHotkey = _hotkeyManager.PlayHotkey;
         _defaultShortcutBrush.Freeze();
         _unavailableShortcutBrush.Freeze();
+        _lockActiveIconBrush.Freeze();
+        _lockInactiveIconBrush.Freeze();
 
         _keyboardHookService.KeyboardActionCaptured += KeyboardHookService_OnKeyboardActionCaptured;
         _mouseHookService.ShouldIgnorePoint = IsPointInsideWindow;
@@ -239,6 +245,17 @@ public partial class MainWindow : Window
         CaptureShortcut(e, isRecordField: false);
     }
 
+    private void LockToggleButton_OnChanged(object sender, RoutedEventArgs e)
+    {
+        if (_isUpdatingUi)
+        {
+            return;
+        }
+
+        _isRecordLocked = LockToggleButton.IsChecked == true;
+        UpdateUiState();
+    }
+
     private void LoopToggleButton_OnChanged(object sender, RoutedEventArgs e)
     {
         if (_isUpdatingUi)
@@ -291,8 +308,14 @@ public partial class MainWindow : Window
 
     private void StartRecording()
     {
+        if (_isRecordLocked)
+        {
+            return;
+        }
+
         bool recordKeyboardActions = RecordKeyboardCheckBox.IsChecked == true;
-        if (!_macroCoordinator.StartRecording(recordKeyboardActions))
+        bool recordAllMouseMoves = RecordAllMovesCheckBox.IsChecked == true;
+        if (!_macroCoordinator.StartRecording(recordKeyboardActions, recordAllMouseMoves))
         {
             return;
         }
@@ -396,7 +419,7 @@ public partial class MainWindow : Window
     {
         _isUpdatingUi = true;
 
-        RecordToggleButton.IsEnabled = !_runtimeSession.IsPlaying;
+        RecordToggleButton.IsEnabled = !_runtimeSession.IsPlaying && !_isRecordLocked;
         RecordToggleButton.IsChecked = _runtimeSession.IsRecording;
         RecordIcon.Visibility = _runtimeSession.IsRecording ? Visibility.Collapsed : Visibility.Visible;
         RecordStopIcon.Visibility = _runtimeSession.IsRecording ? Visibility.Visible : Visibility.Collapsed;
@@ -409,8 +432,12 @@ public partial class MainWindow : Window
 
         RepeatCountTextBox.IsEnabled = !_runtimeSession.IsRecording && !_runtimeSession.IsPlaying && LoopToggleButton.IsChecked != true;
         SpeedTextBox.IsEnabled = !_runtimeSession.IsRecording && !_runtimeSession.IsPlaying;
+        LockToggleButton.IsChecked = _isRecordLocked;
+        LockToggleButton.IsEnabled = !IsBusy;
+        LockIcon.Foreground = _isRecordLocked ? _lockActiveIconBrush : _lockInactiveIconBrush;
         RecordKeyboardCheckBox.IsEnabled = !IsBusy;
         StraightPathsCheckBox.IsEnabled = !IsBusy;
+        RecordAllMovesCheckBox.IsEnabled = !IsBusy;
         ImportButton.IsEnabled = !IsBusy;
         ExportButton.IsEnabled = !IsBusy && _macroEventBuffer.HasEvents;
 
@@ -481,6 +508,11 @@ public partial class MainWindow : Window
                     _ = StartPlaybackAsync();
                 }
 
+                handled = true;
+                break;
+            case HotkeyCommand.ToggleLock:
+                _isRecordLocked = !_isRecordLocked;
+                UpdateUiState();
                 handled = true;
                 break;
         }

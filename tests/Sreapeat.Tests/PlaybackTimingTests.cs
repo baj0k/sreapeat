@@ -23,6 +23,15 @@ public sealed class PlaybackTimingTests
     }
 
     [Fact]
+    public void ScaleDelay_WhenScaledTicksExceedLongMaxValue_ReturnsMaxTimeSpan()
+    {
+        TimeSpan hugeDelay = TimeSpan.FromTicks(long.MaxValue / 2);
+        TimeSpan result = PlaybackTiming.ScaleDelay(hugeDelay, 0.1);
+
+        Assert.Equal(TimeSpan.FromTicks(long.MaxValue), result);
+    }
+
+    [Fact]
     public void ContainsKeyboardEvents_ReturnsTrueWhenAnyKeyboardEventExists()
     {
         MacroEvent[] events =

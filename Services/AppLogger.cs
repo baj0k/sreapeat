@@ -120,6 +120,17 @@ internal static class AppLogger
             }
 
             builder.AppendLine();
+            builder.Append("    Message: ").AppendLine(Sanitize(current.Message));
+
+            if (current.StackTrace is not null)
+            {
+                builder.AppendLine("    StackTrace:");
+                foreach (string line in current.StackTrace.Split('\n'))
+                {
+                    builder.Append("      ").AppendLine(line.TrimEnd('\r'));
+                }
+            }
+
             depth++;
         }
     }

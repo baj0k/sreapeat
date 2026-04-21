@@ -75,6 +75,33 @@
             </Setter>
         </Style>
 
+        <Style x:Key="LockToggleStyle" TargetType="ToggleButton">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="3">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#D8D3C6" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#C8C3B4" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="CompactTextBoxStyle" TargetType="TextBox">
             <Setter Property="Width" Value="54" />
             <Setter Property="Height" Value="22" />
@@ -151,35 +178,55 @@
                             HorizontalAlignment="Left"
                             VerticalAlignment="Center">
                     <StackPanel Margin="0,0,10,0">
-                        <ToggleButton x:Name="RecordToggleButton"
-                                      Margin="0"
-                                      Style="{StaticResource IconToggleStyle}"
-                                      Checked="RecordToggleButton_OnChecked"
-                                      Unchecked="RecordToggleButton_OnUnchecked"
-                                      ToolTip="Start or stop recording">
-                            <Grid Width="24"
-                                  Height="24"
-                                  HorizontalAlignment="Center"
-                                  VerticalAlignment="Center">
-                                <Ellipse x:Name="RecordIcon"
-                                         Width="18"
-                                         Height="18"
-                                         HorizontalAlignment="Center"
-                                         VerticalAlignment="Center"
-                                         Fill="#F25050"
-                                         Stroke="#B53C3C"
-                                         StrokeThickness="1.2" />
-                                <Rectangle x:Name="RecordStopIcon"
-                                           Width="13"
-                                           Height="13"
+                        <Grid>
+                            <ToggleButton x:Name="RecordToggleButton"
+                                          Margin="0"
+                                          Style="{StaticResource IconToggleStyle}"
+                                          Checked="RecordToggleButton_OnChecked"
+                                          Unchecked="RecordToggleButton_OnUnchecked"
+                                          ToolTip="Start or stop recording">
+                                <Grid Width="24"
+                                      Height="24"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center">
+                                    <Ellipse x:Name="RecordIcon"
+                                             Width="18"
+                                             Height="18"
+                                             HorizontalAlignment="Center"
+                                             VerticalAlignment="Center"
+                                             Fill="#F25050"
+                                             Stroke="#B53C3C"
+                                             StrokeThickness="1.2" />
+                                    <Rectangle x:Name="RecordStopIcon"
+                                               Width="13"
+                                               Height="13"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               RadiusX="1"
+                                               RadiusY="1"
+                                               Fill="#B94242"
+                                               Visibility="Collapsed" />
+                                </Grid>
+                            </ToggleButton>
+
+                            <ToggleButton x:Name="LockToggleButton"
+                                          Width="18"
+                                          Height="18"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Top"
+                                          Style="{StaticResource LockToggleStyle}"
+                                          Checked="LockToggleButton_OnChanged"
+                                          Unchecked="LockToggleButton_OnChanged"
+                                          ToolTip="Lock recording to prevent accidental overwrites (F9)">
+                                <TextBlock x:Name="LockIcon"
+                                           FontFamily="Segoe MDL2 Assets"
+                                           FontSize="11"
+                                           Foreground="#A09488"
+                                           Text="&#xE72E;"
                                            HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           RadiusX="1"
-                                           RadiusY="1"
-                                           Fill="#B94242"
-                                           Visibility="Collapsed" />
-                            </Grid>
-                        </ToggleButton>
+                                           VerticalAlignment="Center" />
+                            </ToggleButton>
+                        </Grid>
 
                         <TextBlock x:Name="RecordShortcutTextBlock"
                                    Width="48"
@@ -389,6 +436,12 @@
                                       Foreground="#4D473B"
                                       Content="Straight"
                                       ToolTip="Use straight mouse paths during playback" />
+                            <CheckBox x:Name="RecordAllMovesCheckBox"
+                                      Margin="0,3,0,0"
+                                      FontSize="10"
+                                      Foreground="#4D473B"
+                                      Content="All moves"
+                                      ToolTip="Record every mouse movement instead of merging consecutive positions" />
                         </StackPanel>
 
                         <Button x:Name="ImportButton"

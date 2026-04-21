@@ -15,6 +15,11 @@ internal static class PlaybackTiming
             return TimeSpan.Zero;
         }
 
+        if (scaledTicks > long.MaxValue)
+        {
+            return TimeSpan.FromTicks(long.MaxValue);
+        }
+
         return TimeSpan.FromTicks((long)scaledTicks);
     }
 }

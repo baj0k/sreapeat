@@ -11,7 +11,7 @@ public sealed class MacroRuntimeSessionTests
     {
         MacroRuntimeSession session = new();
 
-        bool started = session.TryBeginRecording(recordKeyboardActions: true);
+        bool started = session.TryBeginRecording(recordKeyboardActions: true, recordAllMouseMoves: false);
         session.UpdatePressedPhysicalKeys(new(MacroEventType.KeyDown, 0, 0, 0, TimeSpan.Zero, 0x41));
         bool stopped = session.StopRecording(out bool restoreHotkeys);
 

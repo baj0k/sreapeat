@@ -78,9 +78,9 @@ internal sealed class MacroCoordinator
         _resumeHotkeys = resumeHotkeys;
     }
 
-    public bool StartRecording(bool recordKeyboardActions)
+    public bool StartRecording(bool recordKeyboardActions, bool recordAllMouseMoves = false)
     {
-        if (!_runtimeSession.TryBeginRecording(recordKeyboardActions))
+        if (!_runtimeSession.TryBeginRecording(recordKeyboardActions, recordAllMouseMoves))
         {
             return false;
         }
@@ -177,7 +177,10 @@ internal sealed class MacroCoordinator
             return false;
         }
 
-        _macroEventBuffer.AppendCapturedEvent(capturedEvent, _recordingStopwatch.Elapsed);
+        _macroEventBuffer.AppendCapturedEvent(
+            capturedEvent,
+            _recordingStopwatch.Elapsed,
+            coalesceConsecutiveMoves: !_runtimeSession.RecordAllMouseMoves);
         return true;
     }
 

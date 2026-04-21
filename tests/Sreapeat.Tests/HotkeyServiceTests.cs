@@ -52,6 +52,18 @@ public sealed class HotkeyServiceTests
     }
 
     [Fact]
+    public void IsShortcutTrigger_ReturnsFalseWhenExcessModifierIsPressed()
+    {
+        HotkeyBinding binding = HotkeyService.CreateBinding(Key.F5, ModifierKeys.None);
+        HashSet<uint> pressedKeys = [0x11u]; // Ctrl held, but binding has no modifiers
+        MacroEvent keyboardEvent = new(MacroEventType.KeyDown, 0, 0, 0, TimeSpan.Zero, binding.VirtualKey);
+
+        bool triggered = HotkeyService.IsShortcutTrigger(keyboardEvent, binding, pressedKeys);
+
+        Assert.False(triggered);
+    }
+
+    [Fact]
     public void GetShortcutVirtualKeys_IncludesModifierVirtualKeys()
     {
         HotkeyBinding binding = HotkeyService.CreateBinding(Key.R, ModifierKeys.Control | ModifierKeys.Alt);

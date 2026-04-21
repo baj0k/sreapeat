@@ -33,14 +33,15 @@ internal sealed class MacroEventBuffer
         _lastRecordedOffset = TimeSpan.Zero;
     }
 
-    public void AppendCapturedEvent(MacroEvent capturedEvent, TimeSpan currentOffset)
+    public void AppendCapturedEvent(MacroEvent capturedEvent, TimeSpan currentOffset, bool coalesceConsecutiveMoves = true)
     {
         TimeSpan delay = currentOffset - _lastRecordedOffset;
         _lastRecordedOffset = currentOffset;
 
         MacroEvent timedEvent = capturedEvent with { DelayBeforeEvent = delay };
 
-        if (_events.Count > 0
+        if (coalesceConsecutiveMoves
+            && _events.Count > 0
             && _events[^1].Type == MacroEventType.Move
             && timedEvent.Type == MacroEventType.Move)
         {

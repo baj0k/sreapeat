@@ -34,25 +34,21 @@ internal static class HotkeyService
             return false;
         }
 
-        if ((binding.Modifiers & NativeMethods.ModControl) != 0 && !IsAnyPressed(pressedPhysicalKeys, 0x11, 0xA2, 0xA3))
-        {
-            return false;
-        }
+        bool ctrlRequired = (binding.Modifiers & NativeMethods.ModControl) != 0;
+        bool ctrlPressed = IsAnyPressed(pressedPhysicalKeys, 0x11, 0xA2, 0xA3);
+        if (ctrlRequired != ctrlPressed) return false;
 
-        if ((binding.Modifiers & NativeMethods.ModShift) != 0 && !IsAnyPressed(pressedPhysicalKeys, 0x10, 0xA0, 0xA1))
-        {
-            return false;
-        }
+        bool shiftRequired = (binding.Modifiers & NativeMethods.ModShift) != 0;
+        bool shiftPressed = IsAnyPressed(pressedPhysicalKeys, 0x10, 0xA0, 0xA1);
+        if (shiftRequired != shiftPressed) return false;
 
-        if ((binding.Modifiers & NativeMethods.ModAlt) != 0 && !IsAnyPressed(pressedPhysicalKeys, 0x12, 0xA4, 0xA5))
-        {
-            return false;
-        }
+        bool altRequired = (binding.Modifiers & NativeMethods.ModAlt) != 0;
+        bool altPressed = IsAnyPressed(pressedPhysicalKeys, 0x12, 0xA4, 0xA5);
+        if (altRequired != altPressed) return false;
 
-        if ((binding.Modifiers & NativeMethods.ModWin) != 0 && !IsAnyPressed(pressedPhysicalKeys, 0x5B, 0x5C))
-        {
-            return false;
-        }
+        bool winRequired = (binding.Modifiers & NativeMethods.ModWin) != 0;
+        bool winPressed = IsAnyPressed(pressedPhysicalKeys, 0x5B, 0x5C);
+        if (winRequired != winPressed) return false;
 
         return true;
     }
@@ -84,7 +80,7 @@ internal static class HotkeyService
         return virtualKeys;
     }
 
-    private static bool IsAnyPressed(IReadOnlySet<uint> pressedPhysicalKeys, params uint[] virtualKeys)
+    private static bool IsAnyPressed(IReadOnlySet<uint> pressedPhysicalKeys, params ReadOnlySpan<uint> virtualKeys)
     {
         foreach (uint virtualKey in virtualKeys)
         {

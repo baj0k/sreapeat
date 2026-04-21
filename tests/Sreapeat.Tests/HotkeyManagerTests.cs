@@ -13,11 +13,13 @@ public sealed class HotkeyManagerTests
     {
         HotkeyBinding recordHotkey = HotkeyService.CreateBinding(Key.F5, ModifierKeys.None);
         HotkeyBinding playHotkey = HotkeyService.CreateBinding(Key.F6, ModifierKeys.None);
+        HotkeyBinding lockHotkey = HotkeyService.CreateBinding(Key.F9, ModifierKeys.None);
         List<int> attemptedIds = [];
 
         HotkeyManager manager = new(
             recordHotkey,
             playHotkey,
+            lockHotkey,
             (handle, id, modifiers, virtualKey) =>
             {
                 attemptedIds.Add(id);
@@ -27,7 +29,7 @@ public sealed class HotkeyManagerTests
 
         IReadOnlyList<string> unavailable = manager.RegisterAll((nint)123, resetUnavailableState: true);
 
-        Assert.Equal([HotkeyManager.RecordHotkeyId, HotkeyManager.PlayHotkeyId], attemptedIds);
+        Assert.Equal([HotkeyManager.RecordHotkeyId, HotkeyManager.PlayHotkeyId, HotkeyManager.LockHotkeyId], attemptedIds);
         Assert.Single(unavailable);
         Assert.Contains(playHotkey.DisplayText, unavailable);
         Assert.True(manager.IsUnavailable(playHotkey));
@@ -38,12 +40,14 @@ public sealed class HotkeyManagerTests
     {
         HotkeyBinding recordHotkey = HotkeyService.CreateBinding(Key.F5, ModifierKeys.None);
         HotkeyBinding playHotkey = HotkeyService.CreateBinding(Key.F6, ModifierKeys.None);
+        HotkeyBinding lockHotkey = HotkeyService.CreateBinding(Key.F9, ModifierKeys.None);
         int registerCount = 0;
         int unregisterCount = 0;
 
         HotkeyManager manager = new(
             recordHotkey,
             playHotkey,
+            lockHotkey,
             (handle, id, modifiers, virtualKey) =>
             {
                 registerCount++;
@@ -55,12 +59,12 @@ public sealed class HotkeyManagerTests
         manager.Suspend((nint)123);
 
         Assert.True(manager.AreSuspended);
-        Assert.Equal(2, unregisterCount);
+        Assert.Equal(3, unregisterCount);
 
         manager.Resume((nint)123);
 
         Assert.False(manager.AreSuspended);
-        Assert.Equal(4, registerCount);
+        Assert.Equal(6, registerCount);
     }
 
     [Fact]
@@ -68,11 +72,13 @@ public sealed class HotkeyManagerTests
     {
         HotkeyBinding originalRecordHotkey = HotkeyService.CreateBinding(Key.F5, ModifierKeys.None);
         HotkeyBinding originalPlayHotkey = HotkeyService.CreateBinding(Key.F6, ModifierKeys.None);
+        HotkeyBinding lockHotkey = HotkeyService.CreateBinding(Key.F9, ModifierKeys.None);
         HotkeyBinding updatedPlayHotkey = HotkeyService.CreateBinding(Key.P, ModifierKeys.Control);
 
         HotkeyManager manager = new(
             originalRecordHotkey,
             originalPlayHotkey,
+            lockHotkey,
             (handle, id, modifiers, virtualKey) => virtualKey != originalPlayHotkey.VirtualKey,
             static (_, _) => { });
 
@@ -89,6 +95,7 @@ public sealed class HotkeyManagerTests
         HotkeyManager manager = new(
             HotkeyService.CreateBinding(Key.F5, ModifierKeys.None),
             HotkeyService.CreateBinding(Key.F6, ModifierKeys.None),
+            HotkeyService.CreateBinding(Key.F9, ModifierKeys.None),
             (handle, id, modifiers, virtualKey) => true,
             static (_, _) => { });
 

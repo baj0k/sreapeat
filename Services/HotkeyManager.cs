@@ -8,12 +8,14 @@ internal enum HotkeyCommand
     None,
     ToggleRecord,
     TogglePlay,
+    ToggleLock,
 }
 
 internal sealed class HotkeyManager
 {
     public const int RecordHotkeyId = 1001;
     public const int PlayHotkeyId = 1002;
+    public const int LockHotkeyId = 1003;
 
     private readonly HashSet<string> _unavailableHotkeys = [];
     private readonly Func<nint, int, uint, uint, bool> _registerHotKey;
@@ -22,11 +24,13 @@ internal sealed class HotkeyManager
     public HotkeyManager(
         HotkeyBinding recordHotkey,
         HotkeyBinding playHotkey,
+        HotkeyBinding lockHotkey,
         Func<nint, int, uint, uint, bool>? registerHotKey = null,
         Action<nint, int>? unregisterHotKey = null)
     {
         RecordHotkey = recordHotkey;
         PlayHotkey = playHotkey;
+        LockHotkey = lockHotkey;
         _registerHotKey = registerHotKey ?? ((handle, id, modifiers, virtualKey) => NativeMethods.RegisterHotKey(handle, id, modifiers, virtualKey));
         _unregisterHotKey = unregisterHotKey ?? ((handle, id) => NativeMethods.UnregisterHotKey(handle, id));
     }
@@ -36,6 +40,8 @@ internal sealed class HotkeyManager
     public HotkeyBinding RecordHotkey { get; private set; }
 
     public HotkeyBinding PlayHotkey { get; private set; }
+
+    public HotkeyBinding LockHotkey { get; private set; }
 
     public IReadOnlySet<string> UnavailableHotkeys => _unavailableHotkeys;
 
@@ -51,6 +57,7 @@ internal sealed class HotkeyManager
         List<string> newlyUnavailable = [];
         TryRegister(handle, RecordHotkeyId, RecordHotkey, newlyUnavailable);
         TryRegister(handle, PlayHotkeyId, PlayHotkey, newlyUnavailable);
+        TryRegister(handle, LockHotkeyId, LockHotkey, newlyUnavailable);
         return newlyUnavailable;
     }
 
@@ -66,6 +73,7 @@ internal sealed class HotkeyManager
     {
         _unregisterHotKey(handle, RecordHotkeyId);
         _unregisterHotKey(handle, PlayHotkeyId);
+        _unregisterHotKey(handle, LockHotkeyId);
     }
 
     public void Suspend(nint handle)
@@ -100,6 +108,7 @@ internal sealed class HotkeyManager
         {
             RecordHotkeyId => HotkeyCommand.ToggleRecord,
             PlayHotkeyId => HotkeyCommand.TogglePlay,
+            LockHotkeyId => HotkeyCommand.ToggleLock,
             _ => HotkeyCommand.None,
         };
     }

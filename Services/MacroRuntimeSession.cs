@@ -13,13 +13,15 @@ internal sealed class MacroRuntimeSession : IDisposable
 
     public bool RecordKeyboardActions { get; private set; }
 
+    public bool RecordAllMouseMoves { get; private set; }
+
     public bool UseHookBasedPlaybackStop { get; private set; }
 
     public IReadOnlySet<uint> PressedPhysicalKeys => _pressedPhysicalKeys;
 
     public CancellationToken PlaybackCancellationToken => _playbackCancellationTokenSource?.Token ?? CancellationToken.None;
 
-    public bool TryBeginRecording(bool recordKeyboardActions)
+    public bool TryBeginRecording(bool recordKeyboardActions, bool recordAllMouseMoves)
     {
         if (IsRecording || IsPlaying)
         {
@@ -27,6 +29,7 @@ internal sealed class MacroRuntimeSession : IDisposable
         }
 
         RecordKeyboardActions = recordKeyboardActions;
+        RecordAllMouseMoves = recordAllMouseMoves;
         IsRecording = true;
         return true;
     }
@@ -42,6 +45,7 @@ internal sealed class MacroRuntimeSession : IDisposable
         restoreHotkeys = RecordKeyboardActions;
         IsRecording = false;
         RecordKeyboardActions = false;
+        RecordAllMouseMoves = false;
         ClearPressedPhysicalKeys();
         return true;
     }
@@ -120,6 +124,7 @@ internal sealed class MacroRuntimeSession : IDisposable
         IsPlaying = false;
         IsRecording = false;
         RecordKeyboardActions = false;
+        RecordAllMouseMoves = false;
         UseHookBasedPlaybackStop = false;
         ClearPressedPhysicalKeys();
     }
