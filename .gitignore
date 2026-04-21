@@ -5,10 +5,8 @@
 !/.github/workflows/*.yml
 !/Assets/
 !/Assets/AppIcon.ico
-!/Assets/AppIcon.png
 !/Helpers/
 !/Helpers/*.cs
-!/Helpers/*.ps1
 !/Models/
 !/Models/*.cs
 !/Services/
@@ -20,7 +18,6 @@
 !/LICENSE
 !/CHANGELOG.md
 !/README.md
-!/TODO.md
 !/global.json
 !/sreapeat.csproj
 !/sreapeat.sln
